@@ -19,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // No Laravel 11, as rotas do Sanctum são registradas automaticamente
+        // A rota /sanctum/csrf-cookie já está disponível por padrão
     }
 }
