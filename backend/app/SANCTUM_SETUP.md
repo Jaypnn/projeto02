@@ -1,4 +1,7 @@
-# Configuração Sanctum com Sessões, CSRF e Cookies
+# Configuração Sanctum - Apenas Autenticação por Sessão
+
+Este projeto utiliza **apenas autenticação por sessão** com CSRF tokens e cookies. 
+O suporte a Personal Access Tokens foi removido para simplificar a arquitetura.
 
 ## Configuração Aplicada
 
@@ -43,10 +46,10 @@ await fetch('http://localhost:8000/sanctum/csrf-cookie', {
 });
 ```
 
-### 2. Login com Sessão
+### 2. Login
 ```javascript
 // Login
-const response = await fetch('http://localhost:8000/api/auth/session/login', {
+const response = await fetch('http://localhost:8000/api/auth/login', {
     method: 'POST',
     headers: {
         'Content-Type': 'application/json',
@@ -77,7 +80,7 @@ const user = await fetch('http://localhost:8000/api/me', {
 ### 4. Logout
 ```javascript
 // Logout
-await fetch('http://localhost:8000/api/auth/session/logout', {
+await fetch('http://localhost:8000/api/auth/logout', {
     method: 'POST',
     headers: {
         'Accept': 'application/json',
@@ -88,21 +91,16 @@ await fetch('http://localhost:8000/api/auth/session/logout', {
 
 ## Rotas Disponíveis
 
-### Autenticação por Token
-- `POST /api/auth/register` - Registrar
-- `POST /api/auth/login` - Login (retorna token)
-- `POST /api/auth/logout` - Logout (token)
-
-### Autenticação por Sessão
-- `GET /sanctum/csrf-cookie` - Obter CSRF token
-- `POST /api/auth/session/login` - Login (sessão)
-- `POST /api/auth/session/logout` - Logout (sessão)
+### Autenticação (apenas sessão)
+- `POST /api/auth/register` - Registrar usuário
+- `POST /api/auth/login` - Login (cria sessão)
+- `POST /api/auth/logout` - Logout (destrói sessão)
 - `GET /api/me` - Dados do usuário logado
 
-### Rotas Web (alternativas)
-- `POST /web-auth/login` - Login via web
-- `POST /web-auth/logout` - Logout via web
-- `GET /web-auth/me` - Dados do usuário via web
+### CSRF
+- `GET /sanctum/csrf-cookie` - Obter CSRF token (necessário antes do login)
+
+**Nota:** Todas as rotas protegidas usam `auth:sanctum` middleware, mas apenas com autenticação por sessão.
 
 ## Importante
 
@@ -117,5 +115,7 @@ Para testar se está funcionando:
 
 1. Faça uma requisição GET para `/sanctum/csrf-cookie`
 2. Verifique se o cookie de sessão é definido
-3. Faça login via `/api/auth/session/login`
-4. Acesse `/api/me` sem token, apenas com cookies
+3. Faça login via `/api/auth/login`
+4. Acesse `/api/me` sem token, apenas com cookies de sessão
+
+Ou use o script PowerShell: `scripts/auth-session-test.ps1`

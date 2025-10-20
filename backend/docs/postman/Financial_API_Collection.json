@@ -1,0 +1,1258 @@
+{
+	"info": {
+		"_postman_id": "12345678-1234-1234-1234-123456789abc",
+		"name": "Financial Management API",
+		"description": "Coleção completa da API de gestão financeira Laravel + Sanctum",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "12345678"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "CSRF Cookie",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/sanctum/csrf-cookie",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"sanctum",
+								"csrf-cookie"
+							]
+						},
+						"description": "Obter cookie CSRF - SEMPRE chamar antes do login"
+					}
+				},
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"João Silva\",\n    \"email\": \"joao@teste.com\",\n    \"password\": \"123456789\",\n    \"password_confirmation\": \"123456789\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"joao@teste.com\",\n    \"password\": \"123456789\",\n    \"remember\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					}
+				},
+				{
+					"name": "Me",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/me",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"me"
+							]
+						}
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/auth/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"logout"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Categories",
+			"item": [
+				{
+					"name": "List Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/categories?type=expense&active=true&per_page=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "expense",
+									"description": "income ou expense"
+								},
+								{
+									"key": "active",
+									"value": "true"
+								},
+								{
+									"key": "per_page",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Alimentação\",\n    \"type\": \"expense\",\n    \"description\": \"Gastos com comida e restaurantes\",\n    \"icon\": \"🍔\",\n    \"color\": \"#FF5722\",\n    \"is_active\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/categories",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories"
+							]
+						}
+					}
+				},
+				{
+					"name": "Show Category",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/categories/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Category",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Alimentação Atualizada\",\n    \"description\": \"Gastos com comida, restaurantes e delivery\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/categories/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Category",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/categories/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Category Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/categories/1/stats",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories",
+								"1",
+								"stats"
+							]
+						}
+					}
+				},
+				{
+					"name": "Top Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/categories-top?type=expense&limit=5&period=month",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories-top"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "expense"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								},
+								{
+									"key": "period",
+									"value": "month"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Accounts",
+			"item": [
+				{
+					"name": "List Accounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/accounts?type=checking&active=true",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "checking"
+								},
+								{
+									"key": "active",
+									"value": "true"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Account",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Conta Corrente BB\",\n    \"type\": \"checking\",\n    \"initial_balance\": 1500.00,\n    \"account_number\": \"12345-6\",\n    \"bank_name\": \"Banco do Brasil\",\n    \"currency\": \"BRL\",\n    \"notes\": \"Conta principal para movimentações\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/accounts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts"
+							]
+						}
+					}
+				},
+				{
+					"name": "Show Account",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/accounts/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Account",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Conta Corrente BB Atualizada\",\n    \"notes\": \"Conta principal - atualizada\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/accounts/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Account",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/accounts/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Transfer Between Accounts",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"from_account_id\": 1,\n    \"to_account_id\": 2,\n    \"amount\": 200.00,\n    \"description\": \"Transferência para poupança\",\n    \"notes\": \"Reserva de emergência\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/accounts/transfer",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts",
+								"transfer"
+							]
+						}
+					}
+				},
+				{
+					"name": "Account Balance History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/accounts/1/balance-history?period=month",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts",
+								"1",
+								"balance-history"
+							],
+							"query": [
+								{
+									"key": "period",
+									"value": "month"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Accounts Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/accounts-summary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts-summary"
+							]
+						}
+					}
+				},
+				{
+					"name": "Adjust Account Balance",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"adjustment_amount\": 50.00,\n    \"reason\": \"Ajuste por diferença no extrato\",\n    \"notes\": \"Correção manual do saldo\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/accounts/1/adjust-balance",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts",
+								"1",
+								"adjust-balance"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Transactions",
+			"item": [
+				{
+					"name": "List Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transactions?type=expense&status=completed&per_page=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transactions"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "expense"
+								},
+								{
+									"key": "status",
+									"value": "completed"
+								},
+								{
+									"key": "per_page",
+									"value": "20"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Transaction",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"account_id\": 1,\n    \"category_id\": 1,\n    \"amount\": 45.50,\n    \"type\": \"expense\",\n    \"description\": \"Almoço no restaurante\",\n    \"transaction_date\": \"2025-01-14\",\n    \"notes\": \"Almoço de trabalho\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/transactions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transactions"
+							]
+						}
+					}
+				},
+				{
+					"name": "Show Transaction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transactions/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transactions",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Transaction",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 50.00,\n    \"description\": \"Almoço no restaurante - atualizado\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/transactions/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transactions",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Transaction",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transactions/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transactions",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Complete Transaction",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transactions/1/complete",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transactions",
+								"1",
+								"complete"
+							]
+						}
+					}
+				},
+				{
+					"name": "Cancel Transaction",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transactions/1/cancel",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transactions",
+								"1",
+								"cancel"
+							]
+						}
+					}
+				},
+				{
+					"name": "Transactions Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transactions-summary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transactions-summary"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Budgets",
+			"item": [
+				{
+					"name": "List Budgets",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/budgets",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"budgets"
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Budget",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Orçamento Janeiro 2025\",\n    \"description\": \"Planejamento financeiro para janeiro\",\n    \"start_date\": \"2025-01-01\",\n    \"end_date\": \"2025-01-31\",\n    \"total_limit\": 3000.00,\n    \"currency\": \"BRL\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/budgets",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"budgets"
+							]
+						}
+					}
+				},
+				{
+					"name": "Show Budget",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/budgets/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"budgets",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Budget",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Orçamento Janeiro 2025 - Atualizado\",\n    \"total_limit\": 3200.00\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/budgets/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"budgets",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Budget",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/budgets/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"budgets",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Add Category to Budget",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"category_id\": 1,\n    \"allocated_amount\": 500.00,\n    \"notes\": \"Orçamento para alimentação\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/budgets/1/categories",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"budgets",
+								"1",
+								"categories"
+							]
+						}
+					}
+				},
+				{
+					"name": "Budget Performance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/budgets/1/performance",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"budgets",
+								"1",
+								"performance"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Financial Goals",
+			"item": [
+				{
+					"name": "List Financial Goals",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/financial-goals",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"financial-goals"
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Financial Goal",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Reserva de Emergência\",\n    \"description\": \"6 meses de gastos guardados\",\n    \"target_amount\": 18000.00,\n    \"target_date\": \"2025-12-31\",\n    \"category\": \"emergency_fund\",\n    \"currency\": \"BRL\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/financial-goals",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"financial-goals"
+							]
+						}
+					}
+				},
+				{
+					"name": "Show Financial Goal",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/financial-goals/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"financial-goals",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Financial Goal",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"target_amount\": 20000.00,\n    \"description\": \"6 meses de gastos guardados - meta atualizada\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/financial-goals/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"financial-goals",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Financial Goal",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/financial-goals/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"financial-goals",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Add Contribution",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 300.00,\n    \"contribution_date\": \"2025-01-14\",\n    \"notes\": \"Aporte mensal\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/financial-goals/1/contributions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"financial-goals",
+								"1",
+								"contributions"
+							]
+						}
+					}
+				},
+				{
+					"name": "Goal Progress",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/financial-goals/1/progress",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"financial-goals",
+								"1",
+								"progress"
+							]
+						}
+					}
+				},
+				{
+					"name": "Financial Goals Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/financial-goals-summary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"financial-goals-summary"
+							]
+						}
+					}
+				},
+				{
+					"name": "Upcoming Goals",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/financial-goals-upcoming",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"financial-goals-upcoming"
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}

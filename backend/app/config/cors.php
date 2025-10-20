@@ -19,7 +19,11 @@ return [
         'api/*',
         'sanctum/csrf-cookie',
         'web-auth/*',
-        'auth/*'
+        'auth/*',
+        'auth/register',
+        'auth/login',
+        'auth/logout',
+        'me'
     ],
 
     'allowed_methods' => ['*'],
@@ -28,14 +32,21 @@ return [
         'http://localhost:3000',
         'http://localhost:5173',
         'http://localhost:4200',
+        'http://localhost:8080',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:5173',
         'http://127.0.0.1:4200',
+        'http://127.0.0.1:8080',
     ],
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['*'],
+    'allowed_headers' => [
+        '*',
+        'X-Requested-With',
+        'X-CSRF-TOKEN',
+        'X-XSRF-TOKEN'
+    ],
 
     'exposed_headers' => [],
 

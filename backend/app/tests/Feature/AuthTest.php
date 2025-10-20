@@ -62,13 +62,18 @@ class AuthTest extends TestCase
             'password' => 'password123',
         ];
 
+        // Get CSRF token first
+        $this->get('/sanctum/csrf-cookie');
+
         $response = $this->postJson('/api/auth/login', $loginData);
 
         $response->assertStatus(200)
-                 ->assertJsonStructure([
-                     'token',
-                     'token_type'
+                 ->assertJson([
+                     'message' => 'Logged in successfully'
                  ]);
+
+        // Verify user is authenticated
+        $this->assertAuthenticated('web');
     }
 
     /** @test */
@@ -94,28 +99,36 @@ class AuthTest extends TestCase
     /** @test */
     public function authenticated_user_can_logout()
     {
-        $user = User::factory()->create();
-        $token = $user->createToken('test')->plainTextToken;
+        $user = User::factory()->create([
+            'password' => bcrypt('password123')
+        ]);
 
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $token,
-        ])->postJson('/api/auth/logout');
+        // Get CSRF token first
+        $this->get('/sanctum/csrf-cookie');
+        
+        // Authenticate user using web guard
+        $this->actingAs($user, 'web');
 
-        $response->assertStatus(200)
-                 ->assertJson([
-                     'message' => 'Logged out successfully'
-                 ]);
+        $response = $this->postJson('/api/auth/logout');
+
+        $response->assertStatus(204);
+        
+        // Verify user is no longer authenticated
+        $this->assertGuest('web');
     }
 
     /** @test */
     public function authenticated_user_can_access_protected_route()
     {
         $user = User::factory()->create();
-        $token = $user->createToken('test')->plainTextToken;
 
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $token,
-        ])->getJson('/api/me');
+        // Get CSRF token first
+        $this->get('/sanctum/csrf-cookie');
+        
+        // Authenticate user using web guard
+        $this->actingAs($user, 'web');
+
+        $response = $this->getJson('/api/me');
 
         $response->assertStatus(200)
                  ->assertJsonStructure([
@@ -138,49 +151,5 @@ class AuthTest extends TestCase
                  ]);
     }
 
-    /** @test */
-    public function user_can_login_with_session()
-    {
-        $user = User::factory()->create([
-            'password' => bcrypt('password123')
-        ]);
 
-        $loginData = [
-            'email' => $user->email,
-            'password' => 'password123',
-        ];
-
-        // Get CSRF token first
-        $this->get('/sanctum/csrf-cookie');
-
-        // Test session login
-        $response = $this->postJson('/api/auth/session/login', $loginData);
-
-        $response->assertStatus(200)
-                 ->assertJson([
-                     'message' => 'Logged in successfully'
-                 ]);
-
-        // Verify user is authenticated
-        $this->assertAuthenticated('web');
-    }
-
-    /** @test */
-    public function user_can_logout_from_session()
-    {
-        $user = User::factory()->create([
-            'password' => bcrypt('password123')
-        ]);
-
-        // Authenticate user using web guard
-        $this->actingAs($user, 'web');
-
-        // Test session logout
-        $response = $this->postJson('/api/auth/session/logout');
-
-        $response->assertStatus(204);
-        
-        // Verify user is no longer authenticated
-        $this->assertGuest('web');
-    }
 }

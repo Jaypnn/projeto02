@@ -14,39 +14,26 @@ class AuthController extends Controller
     public function register(RegisterRequest $request)
     {
         $user = User::create($request->validated());
-        return response()->json(['message' => 'Registered successfully'], 201);
-    }
-
-    // Login que retorna token
-    public function loginWithToken(LoginRequest $request)
-    {
-        if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+        
+        // Faz login automático após registro
+        Auth::login($user);
+        
+        // Regenera a sessão se existir (para evitar erro em testes)
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
         }
-
-        $user = Auth::user();
-        $token = $user->createToken('api')->plainTextToken;
-
+        
         return response()->json([
-            'token' => $token, 
+            'message' => 'Registered successfully', 
             'user' => $user
-        ]);
+        ], 201);
     }
 
-    // Logout por token: revoga o token atual (se existir)
-    public function logout(Request $request)
-    {
-        $token = $request->user()->currentAccessToken();
-        if ($token) {
-            $token->delete();
-        }
 
-        return response()->json(['message' => 'Logged out successfully']);
-    }
 
     // Login por sessão (cookie)
-    // REquer que o frontend chame antes: GET /sanctum/csrf-cookie
-    public function loginWithSession(LoginRequest $request)
+    // Requer que o frontend chame antes: GET /sanctum/csrf-cookie
+    public function login(LoginRequest $request)
     {
         if (!Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
             return response()->json(['message' => 'Invalid credentials'], 401);
@@ -57,11 +44,16 @@ class AuthController extends Controller
             $request->session()->regenerate();
         }
 
-        return response()->json(['message' => 'Logged in successfully']);
+        $user = Auth::user();
+        
+        return response()->json([
+            'message' => 'Logged in successfully',
+            'user' => $user
+        ]);
     }
 
     // Logout por sessão (cookie)
-    public function logoutFromSession(Request $request)
+    public function logout(Request $request)
     {
         Auth::guard('web')->logout();
 

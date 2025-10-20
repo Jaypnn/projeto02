@@ -1,0 +1,81 @@
+{
+  "info": {
+    "name": "Projeto02 API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Sanctum CSRF Cookie",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/sanctum/csrf-cookie"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const xsrf = pm.cookies.get('XSRF-TOKEN');",
+              "if (xsrf) { pm.collectionVariables.set('xsrf', xsrf); }",
+              "pm.test('XSRF token captured', function () { pm.expect(pm.collectionVariables.get('xsrf')).to.exist; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Session Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-XSRF-TOKEN", "value": "{{xsrf}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"teste@example.com\",\n  \"password\": \"password\"\n}"
+        },
+        "url": "{{baseUrl}}/api/auth/session/login"
+      }
+    },
+    {
+      "name": "/api/me",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/me" }
+    },
+    {
+      "name": "Session Logout",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "X-XSRF-TOKEN", "value": "{{xsrf}}" } ],
+        "url": "{{baseUrl}}/api/auth/session/logout"
+      }
+    },
+    {
+      "name": "Categories List",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/categories" }
+    },
+    {
+      "name": "Categories Create",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "X-XSRF-TOKEN", "value": "{{xsrf}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Aluguel\",\n  \"type\": \"expense\",\n  \"color\": \"#FF0000\"\n}" },
+        "url": "{{baseUrl}}/api/categories"
+      }
+    },
+    {
+      "name": "Token Login",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"teste@example.com\",\n  \"password\": \"password\"\n}" },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "xsrf", "value": "", "type": "string" }
+  ]
+}

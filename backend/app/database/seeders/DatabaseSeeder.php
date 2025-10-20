@@ -13,11 +13,23 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->command->info('🌱 Iniciando seed do sistema financeiro...');
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        // Usar apenas o seeder simples que funciona
+        $this->call([
+            SimpleFinancialSeeder::class,
         ]);
+
+        // Criar usuário de teste adicional se não existir
+        if (!User::where('email', 'test@example.com')->exists()) {
+            User::create([
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+                'password' => bcrypt('password'),
+            ]);
+            $this->command->info('Usuário de teste adicional criado: test@example.com');
+        }
+
+        $this->command->info('✅ Seed concluído com sucesso!');
     }
 }
