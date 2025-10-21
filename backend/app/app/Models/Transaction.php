@@ -22,6 +22,9 @@ class Transaction extends Model
         'type',
         'transaction_date',
         'status',
+        // Compat: alguns controladores usam destination_account_id
+        'destination_account_id',
+        // legado/compat
         'transfer_account_id',
         'transfer_transaction_id',
         'reference',
@@ -66,6 +69,15 @@ class Transaction extends Model
     public function transferTransaction(): BelongsTo
     {
         return $this->belongsTo(Transaction::class, 'transfer_transaction_id');
+    }
+
+    /**
+     * Alias/novo nome usado pelo TransactionController
+     */
+    public function destinationAccount(): BelongsTo
+    {
+        // Banco padronizado para destination_account_id
+        return $this->belongsTo(Account::class, 'destination_account_id');
     }
 
     /**
@@ -192,8 +204,8 @@ class Transaction extends Model
             $this->account->updateCurrentBalance();
             
             // Se for transferência, atualiza também a conta de destino
-            if ($this->isTransfer() && $this->transferAccount) {
-                $this->transferAccount->updateCurrentBalance();
+            if ($this->isTransfer() && ($this->destinationAccount || $this->transferAccount)) {
+                ($this->destinationAccount ?? $this->transferAccount)->updateCurrentBalance();
             }
         }
     }
@@ -212,8 +224,8 @@ class Transaction extends Model
         // Se for transferência, cancela também a transação vinculada
         if ($this->isTransfer() && $this->transferTransaction) {
             $this->transferTransaction->update(['status' => 'cancelled']);
-            if ($this->transferAccount) {
-                $this->transferAccount->updateCurrentBalance();
+            if ($this->destinationAccount || $this->transferAccount) {
+                ($this->destinationAccount ?? $this->transferAccount)->updateCurrentBalance();
             }
         }
     }

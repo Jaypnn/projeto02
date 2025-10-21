@@ -14,12 +14,16 @@ export default {
       total: 0
     },
     filters: {
-      category: null,
-      account: null,
+      category_id: null,
+      account_id: null,
       type: null,
-      dateFrom: null,
-      dateTo: null,
+      start_date: null,
+      end_date: null,
       search: ''
+    },
+    order: {
+      order_by: 'transaction_date',
+      order_direction: 'desc'
     }
   },
 
@@ -82,6 +86,14 @@ export default {
       }
     },
     
+    SET_PAGINATION(state, pagination) {
+      state.pagination = { ...state.pagination, ...pagination }
+    },
+    
+    SET_ORDER(state, order) {
+      state.order = { ...state.order, ...order }
+    },
+    
     ADD_TRANSACTION(state, transaction) {
       state.transactions.unshift(transaction)
     },
@@ -107,13 +119,14 @@ export default {
     
     CLEAR_FILTERS(state) {
       state.filters = {
-        category: null,
-        account: null,
+        category_id: null,
+        account_id: null,
         type: null,
-        dateFrom: null,
-        dateTo: null,
+        start_date: null,
+        end_date: null,
         search: ''
       }
+      state.pagination.currentPage = 1
     }
   },
 
@@ -123,11 +136,12 @@ export default {
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API com filtros e paginação
+        // Mapeia filtros e paginação conforme a API do backend (Laravel)
         const params = {
           page: state.pagination.currentPage,
           per_page: state.pagination.perPage,
-          ...state.filters
+          ...state.filters,
+          ...state.order
         }
         
         const response = await apiService.transactions.getAll(params)
@@ -139,6 +153,11 @@ export default {
         if (Array.isArray(resData)) {
           // API retornou uma lista simples
           transactions = resData
+          pagination = {
+            currentPage: state.pagination.currentPage,
+            total: resData.length,
+            perPage: state.pagination.perPage
+          }
         } else if (resData && Array.isArray(resData.data)) {
           // API paginada (Laravel paginator)
           transactions = resData.data
@@ -165,12 +184,13 @@ export default {
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
         const response = await apiService.transactions.create(transactionData)
-        
-        commit('ADD_TRANSACTION', response.data)
-        
-        return response.data
+        // Backend retorna { message, data: {...} }
+        const created = response?.data?.data ?? response?.data
+        if (created) {
+          commit('ADD_TRANSACTION', created)
+        }
+        return created
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao criar transação')
         throw error
@@ -184,12 +204,12 @@ export default {
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
         const response = await apiService.transactions.update(id, data)
-        
-        commit('UPDATE_TRANSACTION', response.data)
-        
-        return response.data
+        const updated = response?.data?.data ?? response?.data
+        if (updated) {
+          commit('UPDATE_TRANSACTION', updated)
+        }
+        return updated
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao atualizar transação')
         throw error
@@ -221,6 +241,18 @@ export default {
 
     clearFilters({ commit }) {
       commit('CLEAR_FILTERS')
+    },
+
+    setPage({ commit, dispatch }, page) {
+      if (page < 1) return
+      commit('SET_PAGINATION', { currentPage: page })
+      return dispatch('fetchTransactions')
+    },
+    
+    setOrder({ commit, dispatch }, order) {
+      commit('SET_ORDER', order)
+      commit('SET_PAGINATION', { currentPage: 1 })
+      return dispatch('fetchTransactions')
     }
   }
 }
