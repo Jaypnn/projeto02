@@ -8,9 +8,9 @@
           <div class="flex items-center">
             <router-link to="/" class="flex items-center space-x-2">
               <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                <span class="text-white font-bold text-sm">F</span>
+                <span class="text-white font-bold text-sm">S</span>
               </div>
-              <span class="text-xl font-bold text-gray-900">FinanceApp</span>
+              <span class="text-xl font-bold text-gray-900">Starcatcher</span>
             </router-link>
           </div>
 

@@ -175,10 +175,10 @@ class TransactionController extends Controller
 
             // Atualizar saldo da conta se a transação for completada
             if ($transaction->status === 'completed') {
-                $transaction->account->updateBalance();
+                $transaction->account->updateCurrentBalance();
                 
                 if ($transaction->destination_account_id) {
-                    $transaction->destinationAccount->updateBalance();
+                    $transaction->destinationAccount->updateCurrentBalance();
                 }
             }
 
@@ -279,10 +279,10 @@ class TransactionController extends Controller
 
             // Se mudou para completed, atualizar saldos
             if ($transaction->status === 'completed' && $oldStatus !== 'completed') {
-                $transaction->account->updateBalance();
+                $transaction->account->updateCurrentBalance();
                 
                 if ($transaction->destination_account_id) {
-                    $transaction->destinationAccount->updateBalance();
+                    $transaction->destinationAccount->updateCurrentBalance();
                 }
             }
 
@@ -322,10 +322,10 @@ class TransactionController extends Controller
             // Se a transação estava completed, reverter os saldos
             if ($transaction->status === 'completed') {
                 $transaction->status = 'canceled'; // Temporário para o cálculo
-                $transaction->account->updateBalance();
+                $transaction->account->updateCurrentBalance();
                 
                 if ($transaction->destination_account_id) {
-                    $transaction->destinationAccount->updateBalance();
+                    $transaction->destinationAccount->updateCurrentBalance();
                 }
             }
 
@@ -379,10 +379,10 @@ class TransactionController extends Controller
             $transaction->update(['status' => 'completed']);
             
             // Atualizar saldos
-            $transaction->account->updateBalance();
+            $transaction->account->updateCurrentBalance();
             
             if ($transaction->destination_account_id) {
-                $transaction->destinationAccount->updateBalance();
+                $transaction->destinationAccount->updateCurrentBalance();
             }
 
             DB::commit();
@@ -428,10 +428,10 @@ class TransactionController extends Controller
             
             // Se estava completada, reverter os saldos
             if ($wasCompleted) {
-                $transaction->account->updateBalance();
+                $transaction->account->updateCurrentBalance();
                 
                 if ($transaction->destination_account_id) {
-                    $transaction->destinationAccount->updateBalance();
+                    $transaction->destinationAccount->updateCurrentBalance();
                 }
             }
 

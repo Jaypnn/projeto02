@@ -18,10 +18,42 @@ export default {
     
     activeAccounts: state => state.accounts.filter(a => a.is_active),
     
+    // Soma apenas saldos positivos de contas ativas e marcadas para incluir no total
     totalBalance: state => {
-      return state.accounts.reduce((sum, account) => {
-        return sum + parseFloat(account.balance || 0)
-      }, 0)
+      return state.accounts
+        .filter(a => a.is_active && (a.include_in_total ?? true))
+        .reduce((sum, account) => {
+          const val = Number(account.current_balance ?? account.balance ?? 0)
+          return val > 0 ? sum + val : sum
+        }, 0)
+    },
+
+    // Totais por banco (mapa bank_id -> soma de saldos positivos)
+    totalByBank: state => {
+      return state.accounts
+        .filter(a => a.is_active && (a.include_in_total ?? true))
+        .reduce((acc, a) => {
+          const val = Number(a.current_balance ?? a.balance ?? 0)
+          if (val > 0) {
+            const key = a.bank_id || 'unknown'
+            acc[key] = (acc[key] || 0) + val
+          }
+          return acc
+        }, {})
+    },
+
+    // Totais por tipo de conta (checking, savings, wallet, etc.)
+    totalByType: state => {
+      return state.accounts
+        .filter(a => a.is_active && (a.include_in_total ?? true))
+        .reduce((acc, a) => {
+          const val = Number(a.current_balance ?? a.balance ?? 0)
+          if (val > 0) {
+            const key = a.type || 'other'
+            acc[key] = (acc[key] || 0) + val
+          }
+          return acc
+        }, {})
     },
     
     accountsByType: state => type => state.accounts.filter(a => a.type === type),
@@ -102,17 +134,19 @@ export default {
       }
     },
 
-    async createAccount({ commit }, accountData) {
+  async createAccount({ commit }, accountData) {
       commit('SET_LOADING', true)
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-  const response = await apiService.accounts.create(accountData)
+        const response = await apiService.accounts.create(accountData)
+        const payload = response?.data?.data ?? response?.data
         
-        commit('ADD_ACCOUNT', response.data)
+        if (payload) {
+          commit('ADD_ACCOUNT', payload)
+        }
         
-        return response.data
+        return payload
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao criar conta')
         throw error
@@ -126,12 +160,14 @@ export default {
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-  const response = await apiService.accounts.update(id, data)
+        const response = await apiService.accounts.update(id, data)
+        const payload = response?.data?.data ?? response?.data
         
-        commit('UPDATE_ACCOUNT', response.data)
+        if (payload) {
+          commit('UPDATE_ACCOUNT', payload)
+        }
         
-        return response.data
+        return payload
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao atualizar conta')
         throw error
@@ -145,12 +181,37 @@ export default {
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-  await apiService.accounts.delete(accountId)
+        await apiService.accounts.delete(accountId)
         
         commit('REMOVE_ACCOUNT', accountId)
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao deletar conta')
+        throw error
+      } finally {
+        commit('SET_LOADING', false)
+      }
+    },
+
+    // Helpers específicos para ativar/arquivar
+    async archiveAccount({ dispatch }, id) {
+      return dispatch('updateAccount', { id, data: { is_active: false } })
+    },
+    async activateAccount({ dispatch }, id) {
+      return dispatch('updateAccount', { id, data: { is_active: true } })
+    },
+
+    async reactivateAccount({ commit }, id) {
+      commit('SET_LOADING', true)
+      commit('SET_ERROR', null)
+      try {
+        const response = await apiService.accounts.reactivate(id)
+        const payload = response?.data?.data ?? response?.data
+        if (payload) {
+          commit('UPDATE_ACCOUNT', payload)
+        }
+        return payload
+      } catch (error) {
+        commit('SET_ERROR', error.response?.data?.message || 'Erro ao reativar conta')
         throw error
       } finally {
         commit('SET_LOADING', false)

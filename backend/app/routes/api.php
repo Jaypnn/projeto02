@@ -51,6 +51,7 @@ Route::middleware('auth:web')->group(function () {
     
     // Contas
     Route::apiResource('accounts', AccountController::class);
+    Route::post('accounts/{account}/reactivate', [AccountController::class, 'reactivate']);
     Route::post('accounts/transfer', [AccountController::class, 'transfer']);
     Route::get('accounts/{account}/balance-history', [AccountController::class, 'balanceHistory']);
     Route::get('accounts-summary', [AccountController::class, 'summary']);

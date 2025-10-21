@@ -275,6 +275,12 @@ export const accountService = {
   async adjustBalance(id, data) {
     const response = await api.post(`/accounts/${id}/adjust-balance`, data)
     return response
+  },
+
+  // Reactivate archived account
+  async reactivate(id) {
+    const response = await api.post(`/accounts/${id}/reactivate`)
+    return response
   }
 }
 

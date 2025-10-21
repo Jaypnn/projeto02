@@ -51,17 +51,19 @@ class AccountController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|in:checking,savings,credit_card,investment,cash',
-            'initial_balance' => 'required|numeric',
+            'type' => 'required|in:checking,savings,credit_card,investment,cash,wallet',
+            'initial_balance' => 'required|numeric', // permite negativo
             'account_number' => 'nullable|string|max:50',
             'bank_name' => 'nullable|string|max:255',
+            'bank_id' => 'nullable|string|max:50',
             'currency' => 'string|max:3',
             'is_active' => 'boolean',
             'notes' => 'nullable|string|max:1000',
+            'color' => 'nullable|string|max:20',
         ]);
 
         $validated['user_id'] = $user->id;
-        $validated['current_balance'] = $validated['initial_balance'];
+    $validated['current_balance'] = $validated['initial_balance'];
         $validated['currency'] = $validated['currency'] ?? 'BRL';
         $validated['is_active'] = $validated['is_active'] ?? true;
 
@@ -110,16 +112,24 @@ class AccountController extends Controller
 
         $validated = $request->validate([
             'name' => 'string|max:255',
-            'type' => 'in:checking,savings,credit_card,investment,cash',
+            'type' => 'in:checking,savings,credit_card,investment,cash,wallet',
             'account_number' => 'nullable|string|max:50',
             'bank_name' => 'nullable|string|max:255',
+            'bank_id' => 'nullable|string|max:50',
             'currency' => 'string|max:3',
             'is_active' => 'boolean',
             'notes' => 'nullable|string|max:1000',
+            'color' => 'nullable|string|max:20',
+            'initial_balance' => 'nullable|numeric',
         ]);
 
-        // Não permitir alterar initial_balance aqui
-        // Isso deve ser feito através de uma operação específica
+        // Se alterar o saldo inicial, ajusta o saldo atual pela diferença
+        if ($request->has('initial_balance')) {
+            $newInitial = (float) $validated['initial_balance'];
+            $oldInitial = (float) $account->initial_balance;
+            $delta = $newInitial - $oldInitial;
+            $validated['current_balance'] = (float) $account->current_balance + $delta;
+        }
 
         $account->update($validated);
 
@@ -140,13 +150,8 @@ class AccountController extends Controller
             return response()->json(['message' => 'Conta não encontrada.'], 404);
         }
 
-        // Verificar se tem transações
-        if ($account->transactions()->exists()) {
-            return response()->json([
-                'message' => 'Não é possível excluir uma conta com transações.',
-            ], 422);
-        }
-
+        // Excluir a conta; as transações com account_id serão removidas via ON DELETE CASCADE
+        // Outras referências (ex.: transfer_account_id) ficam como null (onDelete('set null'))
         $account->delete();
 
         return response()->json([
@@ -242,21 +247,56 @@ class AccountController extends Controller
     {
         $user = Auth::user();
 
+        $base = Account::where('user_id', $user->id);
+
         $summary = [
-            'total_accounts' => Account::where('user_id', $user->id)->where('is_active', true)->count(),
-            'total_balance' => Account::where('user_id', $user->id)->sum('current_balance'),
-            'by_type' => Account::where('user_id', $user->id)
+            'total_accounts' => (clone $base)->where('is_active', true)->count(),
+            // Soma de todos os saldos (positivos e negativos) para compatibilidade
+            'total_balance' => (clone $base)->sum('current_balance'),
+            // Soma de saldos positivos apenas das contas ativas e incluídas no total
+            'total_balance_positive_active' => (clone $base)
+                ->where('is_active', true)
+                ->where('include_in_total', true)
+                ->where('current_balance', '>', 0)
+                ->sum('current_balance'),
+            'by_type' => (clone $base)
                 ->selectRaw('type, COUNT(*) as count, SUM(current_balance) as total_balance')
                 ->groupBy('type')
                 ->get(),
-            'by_currency' => Account::where('user_id', $user->id)
+            'by_currency' => (clone $base)
                 ->selectRaw('currency, COUNT(*) as count, SUM(current_balance) as total_balance')
                 ->groupBy('currency')
+                ->get(),
+            'by_bank_positive_active' => (clone $base)
+                ->where('is_active', true)
+                ->where('include_in_total', true)
+                ->where('current_balance', '>', 0)
+                ->selectRaw('COALESCE(bank_id, "unknown") as bank_id, COUNT(*) as count, SUM(current_balance) as total_balance')
+                ->groupBy('bank_id')
                 ->get(),
         ];
 
         return response()->json([
             'data' => $summary
+        ]);
+    }
+
+    /**
+     * Reactivate an archived account (set is_active=true)
+     */
+    public function reactivate(Account $account): JsonResponse
+    {
+        $user = Auth::user();
+
+        if ($account->user_id !== $user->id) {
+            return response()->json(['message' => 'Conta não encontrada.'], 404);
+        }
+
+        $account->update(['is_active' => true]);
+
+        return response()->json([
+            'message' => 'Conta reativada com sucesso.',
+            'data' => $account
         ]);
     }
 

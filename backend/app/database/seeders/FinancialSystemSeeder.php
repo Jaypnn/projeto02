@@ -267,7 +267,7 @@ class FinancialSystemSeeder extends Seeder
     private function updateAccountBalances($accounts): void
     {
         $accounts->each(function ($account) {
-            $account->updateBalance();
+            $account->updateCurrentBalance();
         });
     }
 }

@@ -17,6 +17,7 @@ class Account extends Model
         'user_id',
         'name',
         'description',
+        'bank_id',
         'type',
         'initial_balance',
         'current_balance',
