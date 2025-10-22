@@ -108,20 +108,16 @@ class Account extends Model
     {
         $income = $this->transactions()
             ->where('type', 'income')
-            ->where('status', 'completed')
             ->sum('amount');
 
         $expenses = $this->transactions()
             ->where('type', 'expense')
-            ->where('status', 'completed')
             ->sum('amount');
 
         $transfersIn = $this->transfersTo()
-            ->where('status', 'completed')
             ->sum('amount');
 
         $transfersOut = $this->transfersFrom()
-            ->where('status', 'completed')
             ->sum('amount');
 
         return (float) ($this->initial_balance + $income - $expenses + $transfersIn - $transfersOut);
@@ -134,6 +130,22 @@ class Account extends Model
     {
         $this->current_balance = $this->calculateCurrentBalance();
         $this->save();
+    }
+
+    /**
+     * Verifica se há saldo suficiente para uma saída imediata
+     * Observação: usa o saldo calculado para evitar divergências caso o campo esteja desatualizado
+     */
+    public function hasSufficientBalance(float $amount): bool
+    {
+        // Para contas de cartão de crédito, normalmente permitiríamos lançamentos negativos.
+        // Mantemos uma regra simples: somente contas não-cartão exigem saldo >= valor da despesa.
+        if ($this->isCreditCard()) {
+            return true;
+        }
+
+        $available = $this->calculateCurrentBalance();
+        return $available >= $amount;
     }
 
     /**
@@ -158,7 +170,6 @@ class Account extends Model
                 'amount' => $amount,
                 'type' => 'transfer',
                 'transaction_date' => now()->format('Y-m-d'),
-                'status' => 'completed',
                 'transfer_account_id' => $destinationAccount->id,
             ]);
 
@@ -170,7 +181,6 @@ class Account extends Model
                 'amount' => $amount,
                 'type' => 'transfer',
                 'transaction_date' => now()->format('Y-m-d'),
-                'status' => 'completed',
                 'transfer_account_id' => $this->id,
                 'transfer_transaction_id' => $outTransaction->id,
             ]);
@@ -211,9 +221,7 @@ class Account extends Model
             $query->where('type', $filters['type']);
         }
 
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
+        // status removido
 
         return $query;
     }
@@ -223,7 +231,7 @@ class Account extends Model
      */
     public function getStats(string $startDate = null, string $endDate = null): array
     {
-        $query = $this->transactions()->where('status', 'completed');
+    $query = $this->transactions();
 
         if ($startDate) {
             $query->where('transaction_date', '>=', $startDate);

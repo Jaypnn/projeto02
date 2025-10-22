@@ -48,11 +48,7 @@
           </div>
 
           <div v-else>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-            <select v-model.number="form.category_id" :class="inputClasses" required>
-              <option :value="undefined" disabled>Selecione...</option>
-              <option v-for="cat in filteredCategories" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
-            </select>
+            <CategorySelect v-model="form.category_id" :options="categories" label="Categoria" placeholder="Selecione..." />
           </div>
         </div>
 
@@ -75,13 +71,7 @@
               </div>
               <p v-if="amountError" class="mt-1 text-xs text-rose-600">Informe um valor maior que 0.</p>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select v-model="form.status" :class="inputClasses">
-              <option value="completed">Completada</option>
-              <option value="pending">Pendente</option>
-            </select>
-          </div>
+          
         </div>
 
         <div>
@@ -109,9 +99,11 @@
 <script setup>
 import { computed, reactive, watch, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useStore } from 'vuex'
+import CategorySelect from '@/components/categories/CategorySelect.vue'
 
 const props = defineProps({
-  open: { type: Boolean, default: false }
+  open: { type: Boolean, default: false },
+  transaction: { type: Object, default: null }
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -127,7 +119,6 @@ const form = reactive({
   destination_account_id: undefined,
   category_id: undefined,
   amount: undefined,
-  status: 'completed',
   description: '',
   notes: ''
 })
@@ -163,15 +154,34 @@ function formatAmountOnBlur() {
 // Keep display in sync when modal opens or type changes
 watch(() => props.open, (isOpen) => {
   if (isOpen) {
+    // If editing, preload form
+    if (props.transaction) {
+      const t = props.transaction
+      form.type = t.type
+      form.transaction_date = t.transaction_date?.slice(0,10) || new Date().toISOString().slice(0,10)
+      form.account_id = t.account_id
+      form.destination_account_id = t.destination_account_id
+      form.category_id = t.category_id
+  form.amount = Number(t.amount)
+      form.description = t.description || ''
+      form.notes = t.notes || ''
+    } else {
+      form.type = 'expense'
+      form.transaction_date = new Date().toISOString().slice(0, 10)
+      form.account_id = undefined
+      form.destination_account_id = undefined
+      form.category_id = undefined
+  form.amount = undefined
+      form.description = ''
+      form.notes = ''
+    }
+
     displayAmount.value = form.amount ? toBRLString(form.amount) : ''
     amountError.value = false
   }
 })
 
-const filteredCategories = computed(() => {
-  const type = form.type === 'transfer' ? 'expense' : form.type
-  return (categories.value || []).filter(c => c.type === type)
-})
+// categorias não têm mais tipo; usamos todas as ativas
 
 watch(() => form.type, (val) => {
   if (val === 'transfer') {
@@ -194,8 +204,13 @@ async function handleSubmit() {
       return
     }
     const payload = { ...form }
-    const created = await store.dispatch('transactions/createTransaction', payload)
-    emit('saved', created)
+    if (props.transaction?.id) {
+      const updated = await store.dispatch('transactions/updateTransaction', { id: props.transaction.id, data: payload })
+      emit('saved', updated)
+    } else {
+      const created = await store.dispatch('transactions/createTransaction', payload)
+      emit('saved', created)
+    }
     emit('close')
     // reload list
     await store.dispatch('transactions/fetchTransactions')
@@ -212,6 +227,17 @@ function onKeydown(e) {
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
+// garantir categorias carregadas ao abrir
+watch(() => props.open, async (isOpen) => {
+  if (isOpen) {
+    try {
+      if (!Array.isArray(store.state.categories?.categories) || store.state.categories.categories.length === 0) {
+        await store.dispatch('categories/fetchCategories')
+      }
+    } catch {}
+  }
+})
 </script>
 
 <style scoped>

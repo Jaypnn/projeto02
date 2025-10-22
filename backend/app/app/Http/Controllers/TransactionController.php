@@ -20,59 +20,66 @@ class TransactionController extends Controller
     {
         $user = Auth::user();
         
-        $query = Transaction::where('user_id', $user->id)
+        $query = Transaction::query()
+            ->where('transactions.user_id', $user->id)
             ->with(['account', 'category', 'destinationAccount']);
 
-        // Filtros
-        if ($request->has('type')) {
-            $query->where('type', $request->type);
-        }
+        // Normalização de filtros vindos do frontend
+        $rawType = strtolower(trim((string) $request->query('type', '')));
+        $typeMap = [
+            'receita' => 'income', 'receitas' => 'income',
+            'despesa' => 'expense', 'despesas' => 'expense',
+            'transferencia' => 'transfer', 'transferências' => 'transfer', 'transferencias' => 'transfer',
+        ];
+        $type = $typeMap[$rawType] ?? ($rawType ?: null);
+        $accountId = (int) $request->query('account_id', 0);
+        $categoryId = (int) $request->query('category_id', 0);
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $minAmount = $request->query('min_amount');
+        $maxAmount = $request->query('max_amount');
+        $search = $request->query('search');
 
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
+        // Filtros com when + colunas qualificadas
+        $query->when($type === 'income', fn($q) => $q->where('transactions.type', 'income'))
+              ->when($type === 'expense', fn($q) => $q->where('transactions.type', 'expense'))
+              ->when($type === 'transfer', fn($q) => $q->where('transactions.type', 'transfer'))
+              ->when($accountId > 0, fn($q) => $q->where('transactions.account_id', $accountId))
+              ->when($categoryId > 0, fn($q) => $q->where('transactions.category_id', $categoryId))
+              ->when($startDate, fn($q) => $q->where('transactions.transaction_date', '>=', $startDate))
+              ->when($endDate, fn($q) => $q->where('transactions.transaction_date', '<=', $endDate))
+              ->when($minAmount !== null && $minAmount !== '', fn($q) => $q->where('transactions.amount', '>=', $minAmount))
+              ->when($maxAmount !== null && $maxAmount !== '', fn($q) => $q->where('transactions.amount', '<=', $maxAmount));
 
-        if ($request->has('account_id')) {
-            $query->where('account_id', $request->account_id);
-        }
-
-        if ($request->has('category_id')) {
-            $query->where('category_id', $request->category_id);
-        }
-
-        if ($request->has('start_date')) {
-            $query->where('transaction_date', '>=', $request->start_date);
-        }
-
-        if ($request->has('end_date')) {
-            $query->where('transaction_date', '<=', $request->end_date);
-        }
-
-        if ($request->has('min_amount')) {
-            $query->where('amount', '>=', $request->min_amount);
-        }
-
-        if ($request->has('max_amount')) {
-            $query->where('amount', '<=', $request->max_amount);
-        }
+        // status removido: todas as transações são efetivas
 
         if ($request->has('is_recurring')) {
-            $query->where('is_recurring', $request->boolean('is_recurring'));
+            $query->where('transactions.is_recurring', $request->boolean('is_recurring'));
         }
 
         // Busca por descrição
-        if ($request->has('search')) {
-            $query->where('description', 'like', '%' . $request->search . '%');
+        if ($search) {
+            $query->where('transactions.description', 'like', '%' . $search . '%');
         }
 
-        // Ordenação
-        $orderBy = $request->get('order_by', 'transaction_date');
-        $orderDirection = $request->get('order_direction', 'desc');
-        $query->orderBy($orderBy, $orderDirection);
+        // Ordenação com whitelist
+    $allowedOrder = ['transaction_date', 'amount', 'description', 'created_at'];
+        $orderBy = in_array($request->get('order_by'), $allowedOrder, true) ? $request->get('order_by') : 'transaction_date';
+        $orderDirection = strtolower($request->get('order_direction')) === 'asc' ? 'asc' : 'desc';
+    $query->orderBy('transactions.' . $orderBy, $orderDirection);
 
-        $transactions = $query->paginate($request->get('per_page', 15));
+    $transactions = $query->paginate($request->get('per_page', 15))->withQueryString();
 
         return response()->json($transactions);
+    }
+
+    /**
+     * Alias explícito para listar apenas transações do usuário autenticado.
+     * Mantém a mesma resposta de index(), servindo em rota dedicada.
+     */
+    public function myIndex(Request $request): JsonResponse
+    {
+        return $this->index($request);
     }
 
     /**
@@ -107,7 +114,7 @@ class TransactionController extends Controller
             ],
             'amount' => 'required|numeric|min:0.01',
             'type' => 'required|in:income,expense,transfer',
-            'status' => 'in:pending,completed,canceled',
+            // status removido
             'description' => 'required|string|max:255',
             'transaction_date' => 'required|date',
             'notes' => 'nullable|string|max:1000',
@@ -133,15 +140,7 @@ class TransactionController extends Controller
                     'errors' => ['category_id' => ['Categoria é obrigatória para receitas e despesas.']]
                 ], 422);
             }
-            
-            // Verificar se o tipo da categoria é compatível
-            $category = Category::find($validated['category_id']);
-            if ($category && $category->type !== $validated['type']) {
-                return response()->json([
-                    'message' => 'Tipo da categoria incompatível com o tipo da transação.',
-                    'errors' => ['category_id' => ['Tipo da categoria incompatível com o tipo da transação.']]
-                ], 422);
-            }
+            // As categorias não possuem mais tipo; a compatibilidade é determinada apenas pelo tipo da transação.
         }
 
         // Validações de recorrência
@@ -155,11 +154,10 @@ class TransactionController extends Controller
         }
 
         $validated['user_id'] = $user->id;
-        $validated['status'] = $validated['status'] ?? 'completed';
         $validated['is_recurring'] = $validated['is_recurring'] ?? false;
 
-        // Verificar saldo para despesas se for completada imediatamente
-        if ($validated['type'] === 'expense' && $validated['status'] === 'completed') {
+        // Verificar saldo para despesas (todas as transações são efetivas)
+        if ($validated['type'] === 'expense') {
             $account = Account::find($validated['account_id']);
             if (!$account->hasSufficientBalance($validated['amount'])) {
                 return response()->json([
@@ -173,13 +171,10 @@ class TransactionController extends Controller
 
             $transaction = Transaction::create($validated);
 
-            // Atualizar saldo da conta se a transação for completada
-            if ($transaction->status === 'completed') {
-                $transaction->account->updateCurrentBalance();
-                
-                if ($transaction->destination_account_id) {
-                    $transaction->destinationAccount->updateCurrentBalance();
-                }
+            // Atualizar saldos sempre (status removido)
+            $transaction->account->updateCurrentBalance();
+            if ($transaction->destination_account_id) {
+                $transaction->destinationAccount->updateCurrentBalance();
             }
 
             $transaction->load(['account', 'category', 'destinationAccount']);
@@ -230,12 +225,7 @@ class TransactionController extends Controller
             return response()->json(['message' => 'Transação não encontrada.'], 404);
         }
 
-        // Não permitir editar transação completada (apenas cancelar)
-        if ($transaction->status === 'completed') {
-            return response()->json([
-                'message' => 'Não é possível editar uma transação completada.',
-            ], 422);
-        }
+        // status removido: permitir edição normalmente
 
         $validated = $request->validate([
             'account_id' => [
@@ -261,7 +251,7 @@ class TransactionController extends Controller
             ],
             'amount' => 'numeric|min:0.01',
             'type' => 'in:income,expense,transfer',
-            'status' => 'in:pending,completed,canceled',
+            // status removido
             'description' => 'string|max:255',
             'transaction_date' => 'date',
             'notes' => 'nullable|string|max:1000',
@@ -274,16 +264,25 @@ class TransactionController extends Controller
         try {
             DB::beginTransaction();
 
-            $oldStatus = $transaction->status;
+            // Guardar contas antigas para recálculo de saldo
+            $oldAccountId = $transaction->account_id;
+            $oldDestinationId = $transaction->destination_account_id;
+
             $transaction->update($validated);
 
-            // Se mudou para completed, atualizar saldos
-            if ($transaction->status === 'completed' && $oldStatus !== 'completed') {
-                $transaction->account->updateCurrentBalance();
-                
-                if ($transaction->destination_account_id) {
-                    $transaction->destinationAccount->updateCurrentBalance();
-                }
+            // Recalcular saldos de contas afetadas
+            if ($oldAccountId) {
+                $oldAcc = Account::find($oldAccountId);
+                if ($oldAcc) { $oldAcc->updateCurrentBalance(); }
+            }
+            if ($oldDestinationId) {
+                $oldDest = Account::find($oldDestinationId);
+                if ($oldDest) { $oldDest->updateCurrentBalance(); }
+            }
+            // Recalcular novas contas
+            $transaction->account->updateCurrentBalance();
+            if ($transaction->destination_account_id) {
+                $transaction->destinationAccount->updateCurrentBalance();
             }
 
             $transaction->load(['account', 'category', 'destinationAccount']);
@@ -319,17 +318,14 @@ class TransactionController extends Controller
         try {
             DB::beginTransaction();
 
-            // Se a transação estava completed, reverter os saldos
-            if ($transaction->status === 'completed') {
-                $transaction->status = 'canceled'; // Temporário para o cálculo
-                $transaction->account->updateCurrentBalance();
-                
-                if ($transaction->destination_account_id) {
-                    $transaction->destinationAccount->updateCurrentBalance();
-                }
-            }
+            // Atualizar saldos (status removido)
+            $account = $transaction->account;
+            $dest = $transaction->destinationAccount;
 
             $transaction->delete();
+
+            if ($account) { $account->updateCurrentBalance(); }
+            if ($dest) { $dest->updateCurrentBalance(); }
 
             DB::commit();
 
@@ -350,107 +346,12 @@ class TransactionController extends Controller
     /**
      * Complete a pending transaction
      */
-    public function complete(Transaction $transaction): JsonResponse
-    {
-        $user = Auth::user();
-
-        if ($transaction->user_id !== $user->id) {
-            return response()->json(['message' => 'Transação não encontrada.'], 404);
-        }
-
-        if ($transaction->status !== 'pending') {
-            return response()->json([
-                'message' => 'Apenas transações pendentes podem ser completadas.',
-            ], 422);
-        }
-
-        // Verificar saldo para despesas
-        if ($transaction->type === 'expense') {
-            if (!$transaction->account->hasSufficientBalance($transaction->amount)) {
-                return response()->json([
-                    'message' => 'Saldo insuficiente na conta.',
-                ], 422);
-            }
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $transaction->update(['status' => 'completed']);
-            
-            // Atualizar saldos
-            $transaction->account->updateCurrentBalance();
-            
-            if ($transaction->destination_account_id) {
-                $transaction->destinationAccount->updateCurrentBalance();
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Transação completada com sucesso.',
-                'data' => $transaction
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            return response()->json([
-                'message' => 'Erro ao completar transação.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+    // Métodos complete/cancel removidos: status não é mais usado
 
     /**
      * Cancel a transaction
      */
-    public function cancel(Transaction $transaction): JsonResponse
-    {
-        $user = Auth::user();
-
-        if ($transaction->user_id !== $user->id) {
-            return response()->json(['message' => 'Transação não encontrada.'], 404);
-        }
-
-        if ($transaction->status === 'canceled') {
-            return response()->json([
-                'message' => 'Transação já está cancelada.',
-            ], 422);
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $wasCompleted = $transaction->status === 'completed';
-            
-            $transaction->update(['status' => 'canceled']);
-            
-            // Se estava completada, reverter os saldos
-            if ($wasCompleted) {
-                $transaction->account->updateCurrentBalance();
-                
-                if ($transaction->destination_account_id) {
-                    $transaction->destinationAccount->updateCurrentBalance();
-                }
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Transação cancelada com sucesso.',
-                'data' => $transaction
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            return response()->json([
-                'message' => 'Erro ao cancelar transação.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+    
 
     /**
      * Get transaction summary/stats
@@ -465,7 +366,7 @@ class TransactionController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
 
-        $query = Transaction::where('user_id', $user->id)->where('status', 'completed');
+    $query = Transaction::where('user_id', $user->id);
 
         // Filtro por período
         if (!empty($validated['start_date']) && !empty($validated['end_date'])) {

@@ -54,6 +54,9 @@ api.interceptors.request.use(
       const method = config.method?.toUpperCase()
       const hasData = config.data && Object.keys(config.data).length > 0
       console.log(`🔵 ${method} ${config.url}${hasData ? ' (com dados)' : ''}`)
+      if (config.params && Object.keys(config.params).length) {
+        console.log('   ↳ params', config.params)
+      }
     }
     
     return config

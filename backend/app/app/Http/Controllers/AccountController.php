@@ -321,20 +321,21 @@ class AccountController extends Controller
             DB::beginTransaction();
 
             $oldBalance = $account->current_balance;
-            $newBalance = $oldBalance + $validated['adjustment_amount'];
 
-            $account->update(['current_balance' => $newBalance]);
-
-            // Registrar o ajuste como uma transação especial
+            // Registrar o ajuste como uma transação especial (status removido)
             $account->transactions()->create([
                 'user_id' => $user->id,
                 'amount' => abs($validated['adjustment_amount']),
                 'type' => $validated['adjustment_amount'] > 0 ? 'income' : 'expense',
-                'status' => 'completed',
                 'description' => 'Ajuste de saldo: ' . $validated['reason'],
                 'notes' => $validated['notes'],
                 'transaction_date' => now(),
             ]);
+
+            // Recalcular saldo baseado nas transações
+            $account->updateCurrentBalance();
+
+            $newBalance = $account->current_balance;
 
             DB::commit();
 

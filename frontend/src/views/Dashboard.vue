@@ -357,13 +357,13 @@ const loading = ref(false)
 
 // Computed
 const totalBalance = computed(() => store.getters['accounts/totalBalance'])
-const totalIncome = computed(() => store.getters['transactions/totalIncome'])
-const totalExpenses = computed(() => store.getters['transactions/totalExpenses'])
+// Totais independentes da tela de Transações (buscados do backend)
+const totalIncome = ref(0)
+const totalExpenses = ref(0)
 const netIncome = computed(() => totalIncome.value - totalExpenses.value)
 
-const recentTransactions = computed(() => 
-  store.getters['transactions/allTransactions'].slice(0, 5)
-)
+// Transações recentes locais para não poluir o store
+const recentTransactions = ref([])
 
 const activeGoals = computed(() => 
   store.getters['goals/activeGoals'].slice(0, 3)
@@ -432,15 +432,36 @@ const formatDate = (date) => {
   })
 }
 
+import apiService from '@/services'
+
 const refreshData = async () => {
   loading.value = true
   
   try {
-    await Promise.all([
-      store.dispatch('transactions/fetchTransactions'),
+    const end = new Date()
+    const start = new Date(end)
+    start.setDate(end.getDate() - Number(selectedPeriod.value))
+
+    // yyyy-mm-dd
+    const toDate = (d) => d.toISOString().slice(0,10)
+    const params = { start_date: toDate(start), end_date: toDate(end) }
+
+    const [summaryRes] = await Promise.all([
+      apiService.transactions.getSummary(params),
       store.dispatch('accounts/fetchAccounts'),
       store.dispatch('goals/fetchGoals')
     ])
+
+    const sum = summaryRes?.data?.data || summaryRes?.data || {}
+    totalIncome.value = Number(sum.total_income || 0)
+    totalExpenses.value = Number(sum.total_expense || 0)
+
+    // Carrega 5 transações recentes sem mexer no store global
+    try {
+      const listRes = await apiService.transactions.getAll({ per_page: 5, order_by: 'transaction_date', order_direction: 'desc' })
+      const resData = listRes?.data
+      recentTransactions.value = Array.isArray(resData) ? resData.slice(0,5) : (resData?.data || []).slice(0,5)
+    } catch {}
   } catch (error) {
     console.error('Erro ao atualizar dados:', error)
   } finally {
@@ -452,4 +473,8 @@ const refreshData = async () => {
 onMounted(() => {
   refreshData()
 })
+
+// Atualiza quando mudar o período
+import { watch } from 'vue'
+watch(selectedPeriod, refreshData)
 </script>

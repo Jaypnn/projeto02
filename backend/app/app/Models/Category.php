@@ -16,7 +16,6 @@ class Category extends Model
         'user_id',
         'name',
         'description',
-        'type',
         'parent_id',
         'color',
         'icon',
@@ -63,16 +62,6 @@ class Category extends Model
         return $query->where('is_active', true);
     }
 
-    public function scopeIncome(Builder $query): Builder
-    {
-        return $query->where('type', 'income');
-    }
-
-    public function scopeExpense(Builder $query): Builder
-    {
-        return $query->where('type', 'expense');
-    }
-
     public function scopeForUser(Builder $query, int $userId): Builder
     {
         return $query->where('user_id', $userId);
@@ -81,22 +70,14 @@ class Category extends Model
     /**
      * Métodos auxiliares
      */
-    public function isIncome(): bool
-    {
-        return $this->type === 'income';
-    }
-
-    public function isExpense(): bool
-    {
-        return $this->type === 'expense';
-    }
+    // Tipo da transação será definido na própria transação; categorias não possuem tipo fixo.
 
     /**
      * Calcula o total de transações desta categoria em um período
      */
     public function getTotalTransactions(string $startDate = null, string $endDate = null): float
     {
-        $query = $this->transactions()->where('status', 'completed');
+    $query = $this->transactions();
         
         if ($startDate) {
             $query->where('transaction_date', '>=', $startDate);

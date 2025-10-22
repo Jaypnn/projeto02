@@ -14,11 +14,7 @@ export default {
     categoryById: state => id => state.categories.find(c => c.id === id),
     categoriesLoading: state => state.loading,
     categoriesError: state => state.error,
-    
-    incomeCategories: state => state.categories.filter(c => c.type === 'income'),
-    expenseCategories: state => state.categories.filter(c => c.type === 'expense'),
-    
-    categoriesByType: state => type => state.categories.filter(c => c.type === type),
+    // categorias não possuem mais tipo fixo; filtros por tipo devem ser feitos via transações
     
     activeCategoriesOptions: state => {
       return state.categories
@@ -27,7 +23,7 @@ export default {
           value: c.id,
           label: c.name,
           color: c.color,
-          type: c.type
+          icon: c.icon
         }))
     }
   },
@@ -91,12 +87,14 @@ export default {
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-  const response = await apiService.categories.create(categoryData)
+        const response = await apiService.categories.create(categoryData)
+        const payload = response?.data?.data || response?.data
         
-        commit('ADD_CATEGORY', response.data)
+        if (payload) {
+          commit('ADD_CATEGORY', payload)
+        }
         
-        return response.data
+        return payload
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao criar categoria')
         throw error
@@ -110,12 +108,14 @@ export default {
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-  const response = await apiService.categories.update(id, data)
+        const response = await apiService.categories.update(id, data)
+        const payload = response?.data?.data || response?.data
         
-        commit('UPDATE_CATEGORY', response.data)
+        if (payload) {
+          commit('UPDATE_CATEGORY', payload)
+        }
         
-        return response.data
+        return payload
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao atualizar categoria')
         throw error

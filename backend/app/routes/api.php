@@ -59,8 +59,9 @@ Route::middleware('auth:web')->group(function () {
     
     // Transações
     Route::apiResource('transactions', TransactionController::class);
-    Route::post('transactions/{transaction}/complete', [TransactionController::class, 'complete']);
-    Route::post('transactions/{transaction}/cancel', [TransactionController::class, 'cancel']);
+    // Listagem dedicada às transações do usuário autenticado
+    Route::get('my-transactions', [TransactionController::class, 'myIndex']);
+    // Rotas de complete/cancel removidas (status não é mais usado)
     Route::get('transactions-summary', [TransactionController::class, 'summary']);
     
     // Orçamentos

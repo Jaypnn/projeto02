@@ -8,6 +8,8 @@ export default {
     currentTransaction: null,
     loading: false,
     error: null,
+    // Controle para evitar condição de corrida entre múltiplas requisições
+    requestId: 0,
     pagination: {
       currentPage: 1,
       perPage: 20,
@@ -127,24 +129,46 @@ export default {
         search: ''
       }
       state.pagination.currentPage = 1
+    },
+
+    // Incrementa o id da requisição para invalidar respostas antigas
+    INC_REQUEST_ID(state) {
+      state.requestId += 1
     }
   },
 
   actions: {
-    async fetchTransactions({ commit, state }) {
+  async fetchTransactions({ commit, state }, options = {}) {
+      // Marca esta chamada como a mais recente
+      commit('INC_REQUEST_ID')
+      const thisRequest = state.requestId
       commit('SET_LOADING', true)
       commit('SET_ERROR', null)
       
       try {
         // Mapeia filtros e paginação conforme a API do backend (Laravel)
+        const filterParams = options?.ignoreFilters ? {} : state.filters
         const params = {
           page: state.pagination.currentPage,
           per_page: state.pagination.perPage,
-          ...state.filters,
+          ...filterParams,
           ...state.order
         }
+        // Remove chaves com null/undefined/string vazia para evitar filtros indevidos no backend
+        Object.keys(params).forEach((k) => {
+          const v = params[k]
+          if (v === null || v === undefined || v === '') {
+            delete params[k]
+          }
+        })
         
-        const response = await apiService.transactions.getAll(params)
+  // Usa a rota dedicada /my-transactions para garantir escopo do usuário
+  const response = await apiService.transactions.getMine(params)
+
+        // Se outra requisição mais recente já foi iniciada, ignora esta resposta
+        if (thisRequest !== state.requestId) {
+          return
+        }
 
         const resData = response?.data
         let transactions = []
@@ -168,14 +192,21 @@ export default {
           }
         }
 
+        // Nota: não filtramos mais no cliente para não interferir no Dashboard.
+
         commit('SET_TRANSACTIONS', { transactions, pagination })
         
         return response.data
       } catch (error) {
+        if (thisRequest !== state.requestId) {
+          return
+        }
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao carregar transações')
         throw error
       } finally {
-        commit('SET_LOADING', false)
+        if (thisRequest === state.requestId) {
+          commit('SET_LOADING', false)
+        }
       }
     },
 
@@ -235,8 +266,12 @@ export default {
       }
     },
 
-    setFilters({ commit }, filters) {
+    setFilters({ commit, dispatch }, filters) {
+      // Atualiza filtros e já recarrega a lista com a página 1,
+      // garantindo que a primeira chamada após "Aplicar" contenha os params.
       commit('SET_FILTERS', filters)
+      commit('SET_PAGINATION', { currentPage: 1 })
+      return dispatch('fetchTransactions')
     },
 
     clearFilters({ commit }) {
@@ -252,6 +287,12 @@ export default {
     setOrder({ commit, dispatch }, order) {
       commit('SET_ORDER', order)
       commit('SET_PAGINATION', { currentPage: 1 })
+      return dispatch('fetchTransactions')
+    },
+
+    setPerPage({ commit, dispatch }, perPage) {
+      const per = Number(perPage) || 10
+      commit('SET_PAGINATION', { perPage: per, currentPage: 1 })
       return dispatch('fetchTransactions')
     }
   }

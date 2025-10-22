@@ -20,11 +20,6 @@ class CategoryController extends Controller
         $query = Category::where('user_id', $user->id)
             ->with(['parent', 'children']);
 
-        // Filtros
-        if ($request->has('type')) {
-            $query->where('type', $request->type);
-        }
-
         if ($request->has('active')) {
             $query->where('is_active', $request->boolean('active'));
         }
@@ -57,7 +52,6 @@ class CategoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
-            'type' => 'required|in:income,expense',
             'parent_id' => [
                 'nullable',
                 'integer',
@@ -69,17 +63,6 @@ class CategoryController extends Controller
             'color' => 'nullable|string|max:7|regex:/^#[0-9A-Fa-f]{6}$/',
             'is_active' => 'boolean',
         ]);
-
-        // Verificar se o parent é do mesmo tipo
-        if (!empty($validated['parent_id'])) {
-            $parent = Category::find($validated['parent_id']);
-            if ($parent && $parent->type !== $validated['type']) {
-                return response()->json([
-                    'message' => 'A categoria pai deve ser do mesmo tipo.',
-                    'errors' => ['parent_id' => ['A categoria pai deve ser do mesmo tipo.']]
-                ], 422);
-            }
-        }
 
         $validated['user_id'] = $user->id;
         $validated['is_active'] = $validated['is_active'] ?? true;
@@ -131,7 +114,6 @@ class CategoryController extends Controller
         $validated = $request->validate([
             'name' => 'string|max:255',
             'description' => 'nullable|string|max:1000',
-            'type' => 'in:income,expense',
             'parent_id' => [
                 'nullable',
                 'integer',
@@ -143,18 +125,6 @@ class CategoryController extends Controller
             'color' => 'nullable|string|max:7|regex:/^#[0-9A-Fa-f]{6}$/',
             'is_active' => 'boolean',
         ]);
-
-        // Verificar se o parent é do mesmo tipo
-        if (!empty($validated['parent_id'])) {
-            $parent = Category::find($validated['parent_id']);
-            $newType = $validated['type'] ?? $category->type;
-            if ($parent && $parent->type !== $newType) {
-                return response()->json([
-                    'message' => 'A categoria pai deve ser do mesmo tipo.',
-                    'errors' => ['parent_id' => ['A categoria pai deve ser do mesmo tipo.']]
-                ], 422);
-            }
-        }
 
         // Não permitir tornar uma categoria pai de si mesma
         if (!empty($validated['parent_id']) && $validated['parent_id'] == $category->id) {
@@ -231,20 +201,15 @@ class CategoryController extends Controller
         $user = Auth::user();
         
         $validated = $request->validate([
-            'type' => 'nullable|in:income,expense',
             'limit' => 'integer|min:1|max:50',
             'period' => 'nullable|in:week,month,quarter,year',
         ]);
 
         $query = Category::where('user_id', $user->id);
 
-        if (!empty($validated['type'])) {
-            $query->where('type', $validated['type']);
-        }
-
         // Adicionar contagem de transações no período
         $query->withCount(['transactions' => function ($query) use ($validated) {
-            $query->where('status', 'completed');
+            // status removido
             
             if (!empty($validated['period'])) {
                 $date = match($validated['period']) {

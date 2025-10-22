@@ -11,6 +11,12 @@ export const transactionService = {
     return response
   },
 
+  // Get transactions scoped to current authenticated user (backend-enforced)
+  async getMine(params = {}) {
+    const response = await api.get('/my-transactions', { params })
+    return response
+  },
+
   // Get transaction by ID
   async getById(id) {
     const response = await api.get(`/transactions/${id}`)
@@ -35,21 +41,10 @@ export const transactionService = {
     return response
   },
 
-  // Complete transaction
-  async complete(id) {
-    const response = await api.post(`/transactions/${id}/complete`)
-    return response
-  },
-
-  // Cancel transaction
-  async cancel(id) {
-    const response = await api.post(`/transactions/${id}/cancel`)
-    return response
-  },
 
   // Get transactions summary
-  async getSummary() {
-    const response = await api.get('/transactions-summary')
+  async getSummary(params = {}) {
+    const response = await api.get('/transactions-summary', { params })
     return response
   }
 }

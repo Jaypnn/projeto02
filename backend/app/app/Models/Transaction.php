@@ -21,7 +21,6 @@ class Transaction extends Model
         'amount',
         'type',
         'transaction_date',
-        'status',
         // Compat: alguns controladores usam destination_account_id
         'destination_account_id',
         // legado/compat
@@ -85,27 +84,29 @@ class Transaction extends Model
      */
     public function scopeIncome(Builder $query): Builder
     {
-        return $query->where('type', 'income');
+        return $query->where('transactions.type', 'income');
     }
 
     public function scopeExpense(Builder $query): Builder
     {
-        return $query->where('type', 'expense');
+        return $query->where('transactions.type', 'expense');
     }
 
     public function scopeTransfer(Builder $query): Builder
     {
-        return $query->where('type', 'transfer');
+        return $query->where('transactions.type', 'transfer');
     }
 
     public function scopeCompleted(Builder $query): Builder
     {
-        return $query->where('status', 'completed');
+        // status removido; mantém por compat mas não filtra
+        return $query;
     }
 
     public function scopePending(Builder $query): Builder
     {
-        return $query->where('status', 'pending');
+        // status removido; mantém por compat mas não filtra
+        return $query;
     }
 
     public function scopeForUser(Builder $query, int $userId): Builder
@@ -176,59 +177,17 @@ class Transaction extends Model
         return $this->type === 'transfer';
     }
 
-    public function isPending(): bool
-    {
-        return $this->status === 'pending';
-    }
-
-    public function isCompleted(): bool
-    {
-        return $this->status === 'completed';
-    }
-
-    public function isCancelled(): bool
-    {
-        return $this->status === 'cancelled';
-    }
+    // status removido
 
     /**
      * Marca a transação como concluída e atualiza o saldo da conta
      */
-    public function markAsCompleted(): void
-    {
-        if ($this->status !== 'completed') {
-            $this->status = 'completed';
-            $this->save();
-            
-            // Atualiza o saldo da conta
-            $this->account->updateCurrentBalance();
-            
-            // Se for transferência, atualiza também a conta de destino
-            if ($this->isTransfer() && ($this->destinationAccount || $this->transferAccount)) {
-                ($this->destinationAccount ?? $this->transferAccount)->updateCurrentBalance();
-            }
-        }
-    }
+    // markAsCompleted removido
 
     /**
      * Cancela a transação
      */
-    public function cancel(): void
-    {
-        $this->status = 'cancelled';
-        $this->save();
-        
-        // Atualiza o saldo da conta
-        $this->account->updateCurrentBalance();
-        
-        // Se for transferência, cancela também a transação vinculada
-        if ($this->isTransfer() && $this->transferTransaction) {
-            $this->transferTransaction->update(['status' => 'cancelled']);
-            if ($this->destinationAccount || $this->transferAccount) {
-                ($this->destinationAccount ?? $this->transferAccount)->updateCurrentBalance();
-            }
-        }
-    }
+    // cancel removido
 
     /**
      * Obtém o valor formatado
@@ -296,7 +255,6 @@ class Transaction extends Model
             'amount' => $this->amount,
             'type' => $this->type,
             'transaction_date' => $nextDate,
-            'status' => 'pending',
             'reference' => $this->reference,
             'tags' => $this->tags,
             'is_recurring' => true,
