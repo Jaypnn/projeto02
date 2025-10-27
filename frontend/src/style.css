@@ -17,3 +17,18 @@ body {
 #app {
   min-height: 100vh;
 }
+
+/* Hand cursor for anything clickable */
+button:not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+[role="button"]:not(.disabled),
+a[href],
+.btn,
+.clickable,
+.cursor-pointer,
+.router-link-active,
+.router-link {
+  cursor: pointer;
+}

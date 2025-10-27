@@ -16,8 +16,9 @@ export default {
     goalsLoading: state => state.loading,
     goalsError: state => state.error,
     
-    activeGoals: state => state.goals.filter(g => g.is_active && !g.is_completed),
-    completedGoals: state => state.goals.filter(g => g.is_completed),
+  // Align with backend: use status field instead of non-existent is_active/is_completed
+  activeGoals: state => state.goals.filter(g => g.status === 'active'),
+  completedGoals: state => state.goals.filter(g => g.status === 'completed'),
     
     goalProgress: state => goalId => {
       const goal = state.goals.find(g => g.id === goalId)
@@ -80,13 +81,12 @@ export default {
   },
 
   actions: {
-    async fetchGoals({ commit }) {
+  async fetchGoals({ commit }, params = {}) {
       commit('SET_LOADING', true)
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-        const response = await apiService.goals.getAll()
+  const response = await apiService.goals.getAll(params)
 
         const resData = response?.data
         const goals = Array.isArray(resData)
@@ -104,17 +104,19 @@ export default {
       }
     },
 
-    async createGoal({ commit }, goalData) {
+  async createGoal({ commit }, goalData) {
       commit('SET_LOADING', true)
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-  const response = await apiService.goals.create(goalData)
+        const response = await apiService.goals.create(goalData)
+        const payload = response?.data?.data || response?.data
+
+        if (payload) {
+          commit('ADD_GOAL', payload)
+        }
         
-        commit('ADD_GOAL', response.data)
-        
-        return response.data
+        return payload
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao criar meta')
         throw error
@@ -128,12 +130,14 @@ export default {
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-  const response = await apiService.goals.update(id, data)
+        const response = await apiService.goals.update(id, data)
+        const payload = response?.data?.data || response?.data
+
+        if (payload) {
+          commit('UPDATE_GOAL', payload)
+        }
         
-        commit('UPDATE_GOAL', response.data)
-        
-        return response.data
+        return payload
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao atualizar meta')
         throw error
@@ -147,9 +151,7 @@ export default {
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-  await apiService.goals.delete(goalId)
-        
+        await apiService.goals.delete(goalId)
         commit('REMOVE_GOAL', goalId)
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao deletar meta')
@@ -159,19 +161,40 @@ export default {
       }
     },
 
-    async addContribution({ commit }, { goalId, amount }) {
+    async addContribution({ commit }, { goalId, amount, description }) {
       commit('SET_LOADING', true)
       commit('SET_ERROR', null)
       
       try {
-        // TODO: Implementar chamada à API
-  const response = await apiService.goals.addContribution(goalId, { amount })
+        const response = await apiService.goals.addContribution(goalId, { amount, description })
+        const payload = response?.data?.data || response?.data
+
+        if (payload) {
+          commit('UPDATE_GOAL', payload)
+        }
         
-        commit('UPDATE_GOAL', response.data)
-        
-        return response.data
+        return payload
       } catch (error) {
         commit('SET_ERROR', error.response?.data?.message || 'Erro ao adicionar contribuição')
+        throw error
+      } finally {
+        commit('SET_LOADING', false)
+      }
+    },
+
+    async toggleStatus({ commit }, goalId) {
+      commit('SET_LOADING', true)
+      commit('SET_ERROR', null)
+
+      try {
+        const response = await apiService.goals.toggleStatus(goalId)
+        const payload = response?.data?.data || response?.data
+        if (payload) {
+          commit('UPDATE_GOAL', payload)
+        }
+        return payload
+      } catch (error) {
+        commit('SET_ERROR', error.response?.data?.message || 'Erro ao alterar status da meta')
         throw error
       } finally {
         commit('SET_LOADING', false)
