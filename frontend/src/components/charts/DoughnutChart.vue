@@ -5,7 +5,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { Chart } from 'chart.js/auto'
 
 const props = defineProps({
   data: {
@@ -21,46 +22,57 @@ const props = defineProps({
 const chartCanvas = ref(null)
 let chartInstance = null
 
-// Placeholder para Chart.js - será implementado quando a biblioteca for instalada
-const createChart = async () => {
+const buildConfig = () => {
+  const labels = props.data.map(d => d.name)
+  const values = props.data.map(d => Number(d.value || 0))
+  const colors = props.data.map(d => d.color || '#3b82f6')
+
+  return {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Gastos por categoria',
+          data: values,
+          backgroundColor: colors,
+          borderWidth: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const label = ctx.label || ''
+              const v = ctx.parsed || 0
+              return `${label}: ${v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+            }
+          }
+        }
+      },
+      ...props.options
+    }
+  }
+}
+
+const createChart = () => {
   if (!chartCanvas.value) return
-  
-  // TODO: Implementar Chart.js quando instalado
-  console.log('DoughnutChart data:', props.data)
-  console.log('DoughnutChart options:', props.options)
-  
-  // Simulação visual básica por enquanto
   const ctx = chartCanvas.value.getContext('2d')
-  ctx.fillStyle = '#e5e7eb'
-  ctx.fillRect(0, 0, chartCanvas.value.width, chartCanvas.value.height)
-  
-  // Desenha um círculo simples
-  const centerX = chartCanvas.value.width / 2
-  const centerY = chartCanvas.value.height / 2
-  const radius = Math.min(centerX, centerY) * 0.6
-  
-  ctx.beginPath()
-  ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI)
-  ctx.fillStyle = '#9ca3af'
-  ctx.fill()
-  
-  ctx.beginPath()
-  ctx.arc(centerX, centerY, radius * 0.5, 0, 2 * Math.PI)
-  ctx.fillStyle = '#e5e7eb'
-  ctx.fill()
-  
-  ctx.fillStyle = '#374151'
-  ctx.font = '14px Arial'
-  ctx.textAlign = 'center'
-  ctx.fillText('Gráfico de Rosca', centerX, centerY - 5)
-  ctx.fillText('(Chart.js será integrado)', centerX, centerY + 15)
+  if (chartInstance) chartInstance.destroy()
+  chartInstance = new Chart(ctx, buildConfig())
 }
 
 const updateChart = () => {
-  if (chartInstance) {
-    // chartInstance.destroy()
-  }
-  createChart()
+  if (!chartInstance) return createChart()
+  const cfg = buildConfig()
+  chartInstance.data = cfg.data
+  chartInstance.options = cfg.options
+  chartInstance.update()
 }
 
 watch(() => props.data, updateChart, { deep: true })
@@ -69,5 +81,9 @@ watch(() => props.options, updateChart, { deep: true })
 onMounted(async () => {
   await nextTick()
   createChart()
+})
+
+onBeforeUnmount(() => {
+  if (chartInstance) chartInstance.destroy()
 })
 </script>

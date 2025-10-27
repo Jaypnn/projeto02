@@ -360,20 +360,9 @@ const goalProgress = computed(() =>
   store.getters['goals/goalProgress']
 )
 
-const chartData = ref([
-  { date: '2025-01-01', income: 3500, expenses: 2800 },
-  { date: '2025-01-02', income: 0, expenses: 150 },
-  { date: '2025-01-03', income: 500, expenses: 300 },
-  // ... mais dados
-])
+const chartData = ref([])
 
-const categoryData = ref([
-  { name: 'Alimentação', value: 800, color: '#ef4444' },
-  { name: 'Transporte', value: 400, color: '#f97316' },
-  { name: 'Moradia', value: 1200, color: '#eab308' },
-  { name: 'Lazer', value: 300, color: '#22c55e' },
-  { name: 'Outros', value: 200, color: '#3b82f6' }
-])
+const categoryData = ref([])
 
 const chartOptions = ref({
   responsive: true,
@@ -476,6 +465,55 @@ const getPeriodDates = (period) => {
 
 import apiService from '@/services'
 
+// Utilidades de agregação para gráficos
+// Garante parsing LOCAL de 'YYYY-MM-DD' para evitar deslocamento por timezone
+const parseLocal = (str) => {
+  const [y, m, d] = String(str).split('-').map(Number)
+  return new Date(y, (m || 1) - 1, d || 1)
+}
+
+const eachDay = (startStr, endStr) => {
+  const out = []
+  const start = parseLocal(startStr)
+  const end = parseLocal(endStr)
+  for (let d = new Date(start.getFullYear(), start.getMonth(), start.getDate()); d <= end; d.setDate(d.getDate() + 1)) {
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    out.push(iso)
+  }
+  return out
+}
+
+const PALETTE = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7','#06b6d4','#84cc16','#f59e0b','#10b981']
+
+const buildDailySeries = (transactions, startDate, endDate) => {
+  const days = eachDay(startDate, endDate)
+  const map = Object.fromEntries(days.map(d => [d, { income: 0, expenses: 0 }]))
+  for (const t of transactions) {
+    const d = String(t.transaction_date).slice(0,10)
+    if (!map[d]) continue
+    if (t.type === 'income') map[d].income += Number(t.amount || 0)
+    else if (t.type === 'expense') map[d].expenses += Number(t.amount || 0)
+  }
+  // Labels apenas com o dia (01..31), sem depender do objeto Date (evita TZ)
+  return days.map(d => ({
+    date: d,
+    label: d.slice(8, 10),
+    income: map[d].income,
+    expenses: map[d].expenses
+  }))
+}
+
+const buildCategoryBreakdown = (transactions) => {
+  const totals = new Map()
+  for (const t of transactions) {
+    if (t.type !== 'expense') continue
+    const name = t.category?.name || 'Sem categoria'
+    totals.set(name, (totals.get(name) || 0) + Number(t.amount || 0))
+  }
+  const items = Array.from(totals.entries()).sort((a,b) => b[1]-a[1])
+  return items.map(([name, value], i) => ({ name, value, color: PALETTE[i % PALETTE.length] }))
+}
+
 const refreshData = async () => {
   const myReq = ++requestId.value
   loading.value = true
@@ -508,8 +546,8 @@ const refreshData = async () => {
         net_income: (sum.total_income ?? 0) - (sum.total_expense ?? 0)
       })
     }
-  totalIncome.value = Number(sum.total_income || 0)
-  totalExpenses.value = Number(sum.total_expense || 0)
+    totalIncome.value = Number(sum.total_income || 0)
+    totalExpenses.value = Number(sum.total_expense || 0)
 
     // Removido: atualização de comparações com período anterior
 
@@ -529,6 +567,27 @@ const refreshData = async () => {
     } catch (e) {
       if (import.meta.env.DEV) console.warn('Falha ao carregar transações recentes do período selecionado:', e?.message)
       recentTransactions.value = []
+    }
+
+    // Carrega todas as transações do período para gráficos (limite alto para mês)
+    try {
+      const seriesRes = await apiService.transactions.getMine({
+        start_date: startDate,
+        end_date: endDate,
+        per_page: 1000,
+        order_by: 'transaction_date',
+        order_direction: 'asc'
+      })
+
+      if (myReq !== requestId.value) return
+
+      const list = Array.isArray(seriesRes?.data) ? seriesRes.data : (seriesRes?.data?.data || [])
+      chartData.value = buildDailySeries(list, startDate, endDate)
+      categoryData.value = buildCategoryBreakdown(list)
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn('Falha ao carregar dados para gráficos:', e?.message)
+      chartData.value = []
+      categoryData.value = []
     }
   } catch (error) {
     console.error('Erro ao atualizar dados:', error)
