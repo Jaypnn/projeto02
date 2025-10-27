@@ -24,8 +24,12 @@ class BudgetController extends Controller
             ->with(['budgetCategories.category']);
 
         // Filtros
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
+        if ($request->has('is_active')) {
+            // aceitar '1'/'0' ou true/false
+            $isActive = filter_var($request->get('is_active'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($isActive !== null) {
+                $query->where('is_active', $isActive);
+            }
         }
 
         if ($request->has('period_type')) {
@@ -61,10 +65,10 @@ class BudgetController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'total_amount' => 'required|numeric|min:0',
-            'period_type' => 'required|in:weekly,monthly,quarterly,yearly',
+            'period_type' => 'required|in:weekly,monthly,quarterly,yearly,custom',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
-            'status' => 'in:draft,active,completed,paused',
+            'is_active' => 'sometimes|boolean',
             'alert_percentage' => 'integer|min:1|max:100',
             'notes' => 'nullable|string|max:1000',
             'categories' => 'nullable|array',
@@ -79,24 +83,8 @@ class BudgetController extends Controller
             'categories.*.notes' => 'nullable|string|max:500',
         ]);
 
-        // Verificar se há sobreposição de datas para orçamentos ativos
-        $overlapping = Budget::where('user_id', $user->id)
-            ->where('status', 'active')
-            ->where(function ($query) use ($validated) {
-                $query->whereBetween('start_date', [$validated['start_date'], $validated['end_date']])
-                    ->orWhereBetween('end_date', [$validated['start_date'], $validated['end_date']])
-                    ->orWhere(function ($q) use ($validated) {
-                        $q->where('start_date', '<=', $validated['start_date'])
-                          ->where('end_date', '>=', $validated['end_date']);
-                    });
-            })
-            ->exists();
-
-        if ($overlapping && ($validated['status'] ?? 'draft') === 'active') {
-            return response()->json([
-                'message' => 'Já existe um orçamento ativo no período especificado.',
-            ], 422);
-        }
+        // Permitir múltiplos orçamentos ativos no mesmo período.
+        // Se desejar restringir por "nome" ou por "categoria", implemente aqui futuramente.
 
         // Verificar se a soma das categorias não excede o total
         if (!empty($validated['categories'])) {
@@ -109,7 +97,7 @@ class BudgetController extends Controller
         }
 
         $validated['user_id'] = $user->id;
-        $validated['status'] = $validated['status'] ?? 'draft';
+    $validated['is_active'] = $validated['is_active'] ?? true;
         $validated['spent_amount'] = 0;
         $validated['remaining_amount'] = $validated['total_amount'];
         $validated['alert_percentage'] = $validated['alert_percentage'] ?? 80;
@@ -200,7 +188,7 @@ class BudgetController extends Controller
         ]);
 
         // Não permitir alterar datas se o orçamento estiver ativo e tiver transações
-        if ($budget->status === 'active' && isset($validated['start_date'], $validated['end_date'])) {
+        if ($budget->is_active && isset($validated['start_date'], $validated['end_date'])) {
             $hasTransactions = $budget->budgetCategories()
                 ->whereHas('category.transactions', function ($query) use ($budget) {
                     $query->whereBetween('transaction_date', [$budget->start_date, $budget->end_date]);
@@ -254,13 +242,7 @@ class BudgetController extends Controller
             return response()->json(['message' => 'Orçamento não encontrado.'], 404);
         }
 
-        // Só permitir excluir se estiver em rascunho
-        if ($budget->status !== 'draft') {
-            return response()->json([
-                'message' => 'Apenas orçamentos em rascunho podem ser excluídos.',
-            ], 422);
-        }
-
+        // Permitir excluir orçamentos ativos também (não remove transações, apenas a configuração).
         $budget->delete();
 
         return response()->json([
@@ -447,7 +429,7 @@ class BudgetController extends Controller
         try {
             DB::beginTransaction();
 
-            $nextBudget = $budget->generateNextPeriod();
+            $nextBudget = $budget->generateNext();
 
             DB::commit();
 

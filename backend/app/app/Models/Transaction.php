@@ -28,18 +28,12 @@ class Transaction extends Model
         'transfer_transaction_id',
         'reference',
         'tags',
-        'is_recurring',
-        'recurring_type',
-        'recurring_interval',
-        'recurring_until',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'transaction_date' => 'date',
-        'recurring_until' => 'date',
         'tags' => 'array',
-        'is_recurring' => 'boolean',
     ];
 
     /**
@@ -145,11 +139,6 @@ class Transaction extends Model
         ]);
     }
 
-    public function scopeRecurring(Builder $query): Builder
-    {
-        return $query->where('is_recurring', true);
-    }
-
     public function scopeWithTags(Builder $query, array $tags): Builder
     {
         return $query->where(function ($q) use ($tags) {
@@ -196,72 +185,6 @@ class Transaction extends Model
     {
         $currency = $this->account->currency ?? 'BRL';
         return number_format($this->amount, 2, ',', '.') . ' ' . $currency;
-    }
-
-    /**
-     * Verifica se a transação deve se repetir
-     */
-    public function shouldRecur(): bool
-    {
-        if (!$this->is_recurring || !$this->recurring_type) {
-            return false;
-        }
-
-        if ($this->recurring_until && now()->isAfter($this->recurring_until)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Calcula a próxima data de recorrência
-     */
-    public function getNextRecurringDate(): ?Carbon
-    {
-        if (!$this->shouldRecur()) {
-            return null;
-        }
-
-        $interval = $this->recurring_interval ?? 1;
-        $lastDate = Carbon::parse($this->transaction_date);
-
-        return match($this->recurring_type) {
-            'daily' => $lastDate->addDays($interval),
-            'weekly' => $lastDate->addWeeks($interval),
-            'monthly' => $lastDate->addMonths($interval),
-            'yearly' => $lastDate->addYears($interval),
-            default => null,
-        };
-    }
-
-    /**
-     * Cria a próxima transação recorrente
-     */
-    public function createNextRecurrence(): ?Transaction
-    {
-        $nextDate = $this->getNextRecurringDate();
-        
-        if (!$nextDate) {
-            return null;
-        }
-
-        return static::create([
-            'user_id' => $this->user_id,
-            'account_id' => $this->account_id,
-            'category_id' => $this->category_id,
-            'description' => $this->description,
-            'notes' => $this->notes,
-            'amount' => $this->amount,
-            'type' => $this->type,
-            'transaction_date' => $nextDate,
-            'reference' => $this->reference,
-            'tags' => $this->tags,
-            'is_recurring' => true,
-            'recurring_type' => $this->recurring_type,
-            'recurring_interval' => $this->recurring_interval,
-            'recurring_until' => $this->recurring_until,
-        ]);
     }
 
     /**

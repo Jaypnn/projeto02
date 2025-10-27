@@ -92,7 +92,6 @@ class BudgetCategory extends Model
         return (float) Transaction::where('category_id', $this->category_id)
             ->where('user_id', $this->budget->user_id)
             ->where('type', 'expense')
-            ->where('status', 'completed')
             ->whereBetween('transaction_date', [
                 $this->budget->start_date,
                 $this->budget->end_date
@@ -230,7 +229,6 @@ class BudgetCategory extends Model
         $historicalAverage = Transaction::where('category_id', $this->category_id)
             ->where('user_id', $this->budget->user_id)
             ->where('type', 'expense')
-            ->where('status', 'completed')
             ->where('transaction_date', '>=', now()->subMonths(3))
             ->avg('amount');
 

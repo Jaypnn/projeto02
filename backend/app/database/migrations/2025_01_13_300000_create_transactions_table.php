@@ -30,10 +30,6 @@ return new class extends Migration
             // Campos adicionais
             $table->string('reference')->nullable(); // referência externa
             $table->json('tags')->nullable(); // tags para organização
-            $table->boolean('is_recurring')->default(false);
-            $table->string('recurring_type')->nullable(); // daily, weekly, monthly, yearly
-            $table->integer('recurring_interval')->nullable(); // intervalo da recorrência
-            $table->date('recurring_until')->nullable(); // até quando repetir
             
             $table->timestamps();
 

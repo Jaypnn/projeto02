@@ -143,18 +143,26 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useStore } from 'vuex'
 import { PlusIcon, CreditCardIcon } from '@heroicons/vue/24/outline'
 import TransactionFormModal from '@/components/transactions/TransactionFormModal.vue'
 import ConfirmModal from '@/components/ui/ConfirmModal.vue'
 
 const store = useStore()
+const route = useRoute()
 
 const transactions = computed(() => {
   const list = store.getters['transactions/allTransactions'] || []
   const f = store.state.transactions?.filters || {}
   const ord = store.state.transactions?.order || { order_by: 'transaction_date', order_direction: 'desc' }
-  const normDate = (d) => d ? new Date(d).toISOString().slice(0,10) : null
+  // Work with date-only strings without timezone shifts
+  const normDate = (d) => {
+    if (!d) return null
+    const s = String(d)
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    return m ? `${m[1]}-${m[2]}-${m[3]}` : new Date(s).toISOString().slice(0,10)
+  }
   const start = normDate(f.start_date)
   const end = normDate(f.end_date)
   const search = (f.search || '').toLowerCase()
@@ -182,9 +190,19 @@ const transactions = computed(() => {
       arr.sort((a, b) => (new Date(a.created_at) - new Date(b.created_at)) * dir)
       break
     case 'transaction_date':
-    default:
-      arr.sort((a, b) => (new Date(a.transaction_date) - new Date(b.transaction_date)) * dir)
+    default: {
+      // Compare date-only safely: avoid timezone off-by-one when value is YYYY-MM-DD
+      const dateKey = (v) => {
+        if (!v) return -Infinity
+        const s = String(v)
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (m) return Number(`${m[1]}${m[2]}${m[3]}`)
+        const t = new Date(s).getTime()
+        return Number.isNaN(t) ? -Infinity : t
+      }
+      arr.sort((a, b) => (dateKey(a.transaction_date) - dateKey(b.transaction_date)) * dir)
       break
+    }
   }
   return arr
 })
@@ -250,8 +268,12 @@ function formatCurrency(value) {
 
 function formatDate(value) {
   if (!value) return '-'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
+  const s = String(value)
+  // If it's a date-only string, format without constructing a Date (avoids timezone shifts)
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`
+  const d = new Date(s)
+  if (Number.isNaN(d.getTime())) return s
   return d.toLocaleDateString('pt-BR')
 }
 
@@ -301,6 +323,23 @@ onMounted(async () => {
   if (!store.getters['categories/allCategories']?.length) {
     try { await store.dispatch('categories/fetchCategories') } catch {}
   }
-  await store.dispatch('transactions/fetchTransactions')
+  // Initialize filters from URL query if present (e.g., from Budgets view)
+  const q = route.query || {}
+  const hasQueryFilters = ['type','category_id','account_id','start_date','end_date','search'].some(k => q[k] != null)
+  if (hasQueryFilters) {
+    // Coerce types safely
+    const parsed = {
+      type: typeof q.type === 'string' && ['income','expense','transfer'].includes(q.type) ? q.type : null,
+      category_id: q.category_id != null ? Number(q.category_id) : null,
+      account_id: q.account_id != null ? Number(q.account_id) : null,
+      start_date: typeof q.start_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.start_date) ? q.start_date : null,
+      end_date: typeof q.end_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.end_date) ? q.end_date : null,
+      search: typeof q.search === 'string' ? q.search : ''
+    }
+    Object.assign(localFilters, parsed)
+    await applyFilters()
+  } else {
+    await store.dispatch('transactions/fetchTransactions')
+  }
 })
 </script>

@@ -5,19 +5,24 @@
       <div>
         <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p class="mt-1 text-sm text-gray-500">
-          Visão geral das suas finanças
+          Visão geral das suas finanças - {{ getPeriodLabel() }}
         </p>
       </div>
-      <div class="mt-4 sm:mt-0 flex space-x-3">
+      <div class="mt-4 sm:mt-0 flex flex-col sm:flex-row sm:items-center sm:space-x-3 space-y-2 sm:space-y-0">
         <select 
           v-model="selectedPeriod" 
           class="rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500"
         >
-          <option value="7">Últimos 7 dias</option>
-          <option value="30">Últimos 30 dias</option>
-          <option value="90">Últimos 90 dias</option>
-          <option value="365">Último ano</option>
+          <option value="current_month">Mês atual</option>
+          <option value="last_month">Mês passado</option>
+          <option value="custom">Selecionar período</option>
         </select>
+        <div v-if="selectedPeriod === 'custom'" class="flex items-center space-x-2">
+          <input type="date" v-model="customStart" class="rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" />
+          <span class="text-gray-500 text-sm">até</span>
+          <input type="date" v-model="customEnd" class="rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" />
+          <button @click="applyCustomPeriod" :disabled="loading || !isCustomValid" class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">Aplicar</button>
+        </div>
         <button
           @click="refreshData"
           :disabled="loading"
@@ -76,17 +81,6 @@
             </div>
           </div>
         </div>
-        <div class="bg-gray-50 px-5 py-3">
-          <div class="text-sm">
-            <span 
-              class="font-medium"
-              :class="incomeChange >= 0 ? 'text-green-600' : 'text-red-600'"
-            >
-              {{ incomeChange >= 0 ? '+' : '' }}{{ incomeChange.toFixed(1) }}%
-            </span>
-            <span class="text-gray-600 ml-1">vs período anterior</span>
-          </div>
-        </div>
       </div>
 
       <!-- Despesas do Período -->
@@ -106,17 +100,6 @@
                 </dd>
               </dl>
             </div>
-          </div>
-        </div>
-        <div class="bg-gray-50 px-5 py-3">
-          <div class="text-sm">
-            <span 
-              class="font-medium"
-              :class="expenseChange <= 0 ? 'text-green-600' : 'text-red-600'"
-            >
-              {{ expenseChange >= 0 ? '+' : '' }}{{ expenseChange.toFixed(1) }}%
-            </span>
-            <span class="text-gray-600 ml-1">vs período anterior</span>
           </div>
         </div>
       </div>
@@ -141,13 +124,6 @@
                 </dd>
               </dl>
             </div>
-          </div>
-        </div>
-        <div class="bg-gray-50 px-5 py-3">
-          <div class="text-sm">
-            <span class="font-medium text-gray-600">
-              {{ netIncome >= 0 ? 'Sobrou' : 'Faltou' }} no período
-            </span>
           </div>
         </div>
       </div>
@@ -352,8 +328,17 @@ import DoughnutChart from '../components/charts/DoughnutChart.vue'
 const store = useStore()
 
 // State
-const selectedPeriod = ref(30)
+const selectedPeriod = ref('current_month')
 const loading = ref(false)
+// Para evitar condição de corrida entre múltiplas atualizações do período
+const requestId = ref(0)
+// Período customizado
+const customStart = ref('')
+const customEnd = ref('')
+const isCustomValid = computed(() => {
+  if (!customStart.value || !customEnd.value) return false
+  return new Date(customStart.value) <= new Date(customEnd.value)
+})
 
 // Computed
 const totalBalance = computed(() => store.getters['accounts/totalBalance'])
@@ -365,6 +350,8 @@ const netIncome = computed(() => totalIncome.value - totalExpenses.value)
 // Transações recentes locais para não poluir o store
 const recentTransactions = ref([])
 
+// Removido: comparações com período anterior
+
 const activeGoals = computed(() => 
   store.getters['goals/activeGoals'].slice(0, 3)
 )
@@ -372,10 +359,6 @@ const activeGoals = computed(() =>
 const goalProgress = computed(() => 
   store.getters['goals/goalProgress']
 )
-
-// Mock data para demonstração
-const incomeChange = ref(12.5)
-const expenseChange = ref(-5.2)
 
 const chartData = ref([
   { date: '2025-01-01', income: 3500, expenses: 2800 },
@@ -432,19 +415,80 @@ const formatDate = (date) => {
   })
 }
 
+const formatDateLabel = (date) => {
+  return new Date(date).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+}
+
+const getPeriodLabel = () => {
+  if (selectedPeriod.value === 'custom') {
+    return isCustomValid.value
+      ? `${formatDateLabel(customStart.value)} a ${formatDateLabel(customEnd.value)}`
+      : 'Período personalizado'
+  }
+  const periodLabels = {
+    current_month: 'Mês atual',
+    last_month: 'Mês passado'
+  }
+  return periodLabels[selectedPeriod.value] || 'Período personalizado'
+}
+
+const getPeriodDates = (period) => {
+  const today = new Date()
+  const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  
+  let startDate, endDate
+
+  switch (period) {
+    case 'current_month':
+      startDate = new Date(localToday.getFullYear(), localToday.getMonth(), 1)
+      endDate = new Date(localToday)
+      break
+      
+    case 'last_month':
+      startDate = new Date(localToday.getFullYear(), localToday.getMonth() - 1, 1)
+      endDate = new Date(localToday.getFullYear(), localToday.getMonth(), 0)
+      break
+      
+    case 'custom':
+      if (isCustomValid.value) {
+        startDate = new Date(customStart.value)
+        endDate = new Date(customEnd.value)
+      } else {
+        startDate = new Date(localToday.getFullYear(), localToday.getMonth(), 1)
+        endDate = new Date(localToday)
+      }
+      break
+      
+    default:
+      startDate = new Date(localToday.getFullYear(), localToday.getMonth(), 1)
+      endDate = new Date(localToday)
+  }
+
+  return {
+    startDate: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`,
+    endDate: `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+  }
+}
+
 import apiService from '@/services'
 
 const refreshData = async () => {
+  const myReq = ++requestId.value
   loading.value = true
+  // Evita exibir dados do período anterior enquanto recarrega
+  recentTransactions.value = []
   
   try {
-    const end = new Date()
-    const start = new Date(end)
-    start.setDate(end.getDate() - Number(selectedPeriod.value))
-
-    // yyyy-mm-dd
-    const toDate = (d) => d.toISOString().slice(0,10)
-    const params = { start_date: toDate(start), end_date: toDate(end) }
+    const { startDate, endDate } = getPeriodDates(selectedPeriod.value)
+    
+    const params = { 
+      start_date: startDate, 
+      end_date: endDate
+    }
 
     const [summaryRes] = await Promise.all([
       apiService.transactions.getSummary(params),
@@ -452,20 +496,46 @@ const refreshData = async () => {
       store.dispatch('goals/fetchGoals')
     ])
 
-    const sum = summaryRes?.data?.data || summaryRes?.data || {}
-    totalIncome.value = Number(sum.total_income || 0)
-    totalExpenses.value = Number(sum.total_expense || 0)
+    // Se outra requisição mais recente já começou, ignora esta resposta
+    if (myReq !== requestId.value) return
 
-    // Carrega 5 transações recentes sem mexer no store global
+    const sum = summaryRes?.data?.data || summaryRes?.data || {}
+    if (import.meta.env.DEV) {
+      console.log('Dashboard summary period ->', sum?.period)
+      console.log('Dashboard summary totals ->', {
+        total_income: sum.total_income,
+        total_expense: sum.total_expense,
+        net_income: (sum.total_income ?? 0) - (sum.total_expense ?? 0)
+      })
+    }
+  totalIncome.value = Number(sum.total_income || 0)
+  totalExpenses.value = Number(sum.total_expense || 0)
+
+    // Removido: atualização de comparações com período anterior
+
+    // Carrega transações recentes do período atual (escopo do usuário) SEM fallback para fora do período
     try {
-      const listRes = await apiService.transactions.getAll({ per_page: 5, order_by: 'transaction_date', order_direction: 'desc' })
+      const listRes = await apiService.transactions.getMine({ 
+        start_date: startDate,
+        end_date: endDate,
+        per_page: 5, 
+        order_by: 'transaction_date', 
+        order_direction: 'desc' 
+      })
+      // Se outra requisição mais recente já começou, ignora esta resposta
+      if (myReq !== requestId.value) return
       const resData = listRes?.data
       recentTransactions.value = Array.isArray(resData) ? resData.slice(0,5) : (resData?.data || []).slice(0,5)
-    } catch {}
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn('Falha ao carregar transações recentes do período selecionado:', e?.message)
+      recentTransactions.value = []
+    }
   } catch (error) {
     console.error('Erro ao atualizar dados:', error)
   } finally {
-    loading.value = false
+    if (myReq === requestId.value) {
+      loading.value = false
+    }
   }
 }
 
@@ -476,5 +546,14 @@ onMounted(() => {
 
 // Atualiza quando mudar o período
 import { watch } from 'vue'
-watch(selectedPeriod, refreshData)
+watch(selectedPeriod, (val) => {
+  if (val !== 'custom') {
+    refreshData()
+  }
+})
+
+const applyCustomPeriod = () => {
+  if (!isCustomValid.value) return
+  refreshData()
+}
 </script>

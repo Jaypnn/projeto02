@@ -34,8 +34,9 @@ class TransactionController extends Controller
         $type = $typeMap[$rawType] ?? ($rawType ?: null);
         $accountId = (int) $request->query('account_id', 0);
         $categoryId = (int) $request->query('category_id', 0);
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
+    // Datas do período (aceita strings no formato YYYY-MM-DD)
+    $startDate = $request->query('start_date');
+    $endDate = $request->query('end_date');
         $minAmount = $request->query('min_amount');
         $maxAmount = $request->query('max_amount');
         $search = $request->query('search');
@@ -46,16 +47,23 @@ class TransactionController extends Controller
               ->when($type === 'transfer', fn($q) => $q->where('transactions.type', 'transfer'))
               ->when($accountId > 0, fn($q) => $q->where('transactions.account_id', $accountId))
               ->when($categoryId > 0, fn($q) => $q->where('transactions.category_id', $categoryId))
-              ->when($startDate, fn($q) => $q->where('transactions.transaction_date', '>=', $startDate))
-              ->when($endDate, fn($q) => $q->where('transactions.transaction_date', '<=', $endDate))
+              // Filtro por período: usar whereBetween/whereDate para evitar problemas de timezone e tipo
+              ->when($startDate && $endDate, function ($q) use ($startDate, $endDate) {
+                  $q->whereBetween('transactions.transaction_date', [
+                      \Carbon\Carbon::parse($startDate)->format('Y-m-d'),
+                      \Carbon\Carbon::parse($endDate)->format('Y-m-d'),
+                  ]);
+              })
+              ->when($startDate && !$endDate, function ($q) use ($startDate) {
+                  $q->whereDate('transactions.transaction_date', '>=', \Carbon\Carbon::parse($startDate)->format('Y-m-d'));
+              })
+              ->when(!$startDate && $endDate, function ($q) use ($endDate) {
+                  $q->whereDate('transactions.transaction_date', '<=', \Carbon\Carbon::parse($endDate)->format('Y-m-d'));
+              })
               ->when($minAmount !== null && $minAmount !== '', fn($q) => $q->where('transactions.amount', '>=', $minAmount))
               ->when($maxAmount !== null && $maxAmount !== '', fn($q) => $q->where('transactions.amount', '<=', $maxAmount));
 
         // status removido: todas as transações são efetivas
-
-        if ($request->has('is_recurring')) {
-            $query->where('transactions.is_recurring', $request->boolean('is_recurring'));
-        }
 
         // Busca por descrição
         if ($search) {
@@ -119,9 +127,6 @@ class TransactionController extends Controller
             'transaction_date' => 'required|date',
             'notes' => 'nullable|string|max:1000',
             'reference' => 'nullable|string|max:100',
-            'is_recurring' => 'boolean',
-            'recurring_frequency' => 'nullable|in:daily,weekly,monthly,quarterly,yearly',
-            'recurring_end_date' => 'nullable|date|after:transaction_date',
         ]);
 
         // Validações específicas por tipo
@@ -144,17 +149,7 @@ class TransactionController extends Controller
         }
 
         // Validações de recorrência
-        if ($validated['is_recurring'] ?? false) {
-            if (empty($validated['recurring_frequency'])) {
-                return response()->json([
-                    'message' => 'Frequência de recorrência é obrigatória.',
-                    'errors' => ['recurring_frequency' => ['Frequência de recorrência é obrigatória.']]
-                ], 422);
-            }
-        }
-
         $validated['user_id'] = $user->id;
-        $validated['is_recurring'] = $validated['is_recurring'] ?? false;
 
         // Verificar saldo para despesas (todas as transações são efetivas)
         if ($validated['type'] === 'expense') {
@@ -256,9 +251,6 @@ class TransactionController extends Controller
             'transaction_date' => 'date',
             'notes' => 'nullable|string|max:1000',
             'reference' => 'nullable|string|max:100',
-            'is_recurring' => 'boolean',
-            'recurring_frequency' => 'nullable|in:daily,weekly,monthly,quarterly,yearly',
-            'recurring_end_date' => 'nullable|date',
         ]);
 
         try {
@@ -364,39 +356,131 @@ class TransactionController extends Controller
             'period' => 'nullable|in:week,month,quarter,year',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
+            'compare_previous' => 'nullable|boolean',
         ]);
 
-    $query = Transaction::where('user_id', $user->id);
+        $query = Transaction::where('user_id', $user->id);
+        $startDate = null;
+        $endDate = null;
 
-        // Filtro por período
-        if (!empty($validated['start_date']) && !empty($validated['end_date'])) {
-            $query->whereBetween('transaction_date', [$validated['start_date'], $validated['end_date']]);
+        // Filtro por período - prioriza start_date/end_date vindos na query
+        $startParam = $request->query('start_date');
+        $endParam = $request->query('end_date');
+
+        if (!empty($startParam) && !empty($endParam)) {
+            $startDate = \Carbon\Carbon::parse($startParam)->format('Y-m-d');
+            $endDate = \Carbon\Carbon::parse($endParam)->format('Y-m-d');
+
+            $query->whereBetween('transaction_date', [$startDate, $endDate]);
         } elseif (!empty($validated['period'])) {
-            $date = match($validated['period']) {
-                'week' => now()->subWeek(),
-                'month' => now()->subMonth(),
-                'quarter' => now()->subQuarter(),
-                'year' => now()->subYear(),
-                default => now()->subMonth(),
+            $endDate = now()->format('Y-m-d');
+            $startDate = match($validated['period']) {
+                'week' => now()->subWeek()->format('Y-m-d'),
+                'month' => now()->subMonth()->format('Y-m-d'),
+                'quarter' => now()->subQuarter()->format('Y-m-d'),
+                'year' => now()->subYear()->format('Y-m-d'),
+                default => now()->subMonth()->format('Y-m-d'),
             };
-            $query->where('transaction_date', '>=', $date);
+            $query->whereBetween('transaction_date', [$startDate, $endDate]);
+        } else {
+            // Se não há parâmetros de período, usar mês atual como padrão
+            $startDate = now()->startOfMonth()->format('Y-m-d');
+            $endDate = now()->format('Y-m-d');
+            $query->whereBetween('transaction_date', [$startDate, $endDate]);
         }
 
         $summary = [
             'total_income' => (clone $query)->where('type', 'income')->sum('amount'),
             'total_expense' => (clone $query)->where('type', 'expense')->sum('amount'),
             'total_transfers' => (clone $query)->where('type', 'transfer')->sum('amount'),
-            'net_income' => 0, // Será calculado abaixo
+            'net_income' => 0,
             'transaction_count' => $query->count(),
             'by_type' => $query->selectRaw('type, COUNT(*) as count, SUM(amount) as total')
                 ->groupBy('type')
                 ->get(),
+            'period' => [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
         ];
 
         $summary['net_income'] = $summary['total_income'] - $summary['total_expense'];
 
+        // Adicionar comparação com período anterior se solicitado
+        if ($validated['compare_previous'] ?? false && $startDate && $endDate) {
+            $previousSummary = $this->getPreviousPeriodSummary($user->id, $startDate, $endDate);
+            $summary['previous_period'] = $previousSummary;
+            $summary['comparison'] = $this->calculatePeriodComparison($summary, $previousSummary);
+        }
+
         return response()->json([
             'data' => $summary
         ]);
+    }
+
+    /**
+     * Calculate summary for the previous period
+     */
+    private function getPreviousPeriodSummary(int $userId, string $startDate, string $endDate): array
+    {
+        $start = new \DateTime($startDate);
+        $end = new \DateTime($endDate);
+        
+        // Detectar se é um período mensal (começa no dia 1)
+        $isMonthlyPeriod = $start->format('d') === '01';
+        
+        if ($isMonthlyPeriod) {
+            // Para períodos mensais, usar o mês anterior completo
+            $previousStart = clone $start;
+            $previousStart->modify('-1 month');
+            $previousEnd = clone $previousStart;
+            $previousEnd->modify('last day of this month');
+        } else {
+            // Para outros períodos, usar a mesma duração no período anterior
+            $periodDays = $start->diff($end)->days + 1;
+            $previousEnd = clone $start;
+            $previousEnd->modify('-1 day');
+            $previousStart = clone $previousEnd;
+            $previousStart->modify('-' . ($periodDays - 1) . ' days');
+        }
+
+        $previousQuery = Transaction::where('user_id', $userId)
+            ->whereDate('transaction_date', '>=', $previousStart->format('Y-m-d'))
+            ->whereDate('transaction_date', '<=', $previousEnd->format('Y-m-d'));
+
+        $previousSummary = [
+            'total_income' => (clone $previousQuery)->where('type', 'income')->sum('amount'),
+            'total_expense' => (clone $previousQuery)->where('type', 'expense')->sum('amount'),
+            'total_transfers' => (clone $previousQuery)->where('type', 'transfer')->sum('amount'),
+            'transaction_count' => $previousQuery->count(),
+            'period' => [
+                'start_date' => $previousStart->format('Y-m-d'),
+                'end_date' => $previousEnd->format('Y-m-d'),
+            ],
+        ];
+
+        $previousSummary['net_income'] = $previousSummary['total_income'] - $previousSummary['total_expense'];
+
+        return $previousSummary;
+    }
+
+    /**
+     * Calculate percentage changes between current and previous period
+     */
+    private function calculatePeriodComparison(array $current, array $previous): array
+    {
+        $calculateChange = function($currentValue, $previousValue) {
+            if ($previousValue == 0) {
+                return $currentValue > 0 ? 100 : 0;
+            }
+            return (($currentValue - $previousValue) / abs($previousValue)) * 100;
+        };
+
+        return [
+            'income_change' => $calculateChange($current['total_income'], $previous['total_income']),
+            'expense_change' => $calculateChange($current['total_expense'], $previous['total_expense']),
+            'net_income_change' => $calculateChange($current['net_income'], $previous['net_income']),
+            'transaction_count_change' => $calculateChange($current['transaction_count'], $previous['transaction_count']),
+        ];
     }
 }

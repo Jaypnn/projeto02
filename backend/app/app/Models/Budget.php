@@ -115,8 +115,8 @@ class Budget extends Model
 
         foreach ($this->budgetCategories as $budgetCategory) {
             $categoryTransactions = Transaction::where('category_id', $budgetCategory->category_id)
+                ->where('user_id', $this->user_id)
                 ->where('type', 'expense')
-                ->where('status', 'completed')
                 ->whereBetween('transaction_date', [$this->start_date, $this->end_date])
                 ->sum('amount');
 
@@ -189,6 +189,53 @@ class Budget extends Model
         }
 
         return $this->remaining_amount / $daysRemaining;
+    }
+
+    /**
+     * Gera alertas do orçamento (nível orçamento e categorias)
+     */
+    public function getAlerts(): array
+    {
+        $alerts = [];
+
+        // Garantir dados atualizados
+        $this->updateCalculatedAmounts();
+
+        // Alerta de orçamento geral
+        if ($this->isOverBudget()) {
+            $alerts[] = [
+                'type' => 'budget_over',
+                'message' => 'O orçamento foi ultrapassado.',
+                'spent_percentage' => round($this->getSpentPercentage(), 2),
+            ];
+        } else {
+            $threshold = $this->settings['alert_threshold'] ?? 80; // %
+            if ($this->getSpentPercentage() >= $threshold) {
+                $alerts[] = [
+                    'type' => 'budget_near_limit',
+                    'message' => 'O orçamento está próximo do limite.',
+                    'spent_percentage' => round($this->getSpentPercentage(), 2),
+                ];
+            }
+        }
+
+        // Alertas por categoria
+        foreach ($this->budgetCategories as $bc) {
+            $bc->updateCalculatedAmounts();
+            if ($bc->needsAlert()) {
+                $alerts[] = [
+                    'type' => 'category',
+                    'category_id' => $bc->category_id,
+                    'category_name' => optional($bc->category)->name,
+                    'status' => $bc->getStatus(),
+                    'spent_percentage' => round($bc->getSpentPercentage(), 2),
+                    'allocated_amount' => (float) $bc->allocated_amount,
+                    'spent_amount' => (float) $bc->spent_amount,
+                ];
+            }
+        }
+
+        return $alerts;
     }
 
     /**

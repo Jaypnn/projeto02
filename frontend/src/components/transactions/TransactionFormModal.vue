@@ -103,7 +103,9 @@ import CategorySelect from '@/components/categories/CategorySelect.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
-  transaction: { type: Object, default: null }
+  transaction: { type: Object, default: null },
+  // Extra payload keys to merge on submit (e.g., { is_recurring: true })
+  extraPayload: { type: Object, default: () => ({}) }
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -112,9 +114,18 @@ const store = useStore()
 const accounts = computed(() => store.getters['accounts/accountsOptions'])
 const categories = computed(() => store.getters['categories/activeCategoriesOptions'])
 
+// Função para obter data local no formato YYYY-MM-DD
+const getLocalDateString = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const form = reactive({
   type: 'expense',
-  transaction_date: new Date().toISOString().slice(0, 10),
+  transaction_date: getLocalDateString(),
   account_id: undefined,
   destination_account_id: undefined,
   category_id: undefined,
@@ -158,7 +169,7 @@ watch(() => props.open, (isOpen) => {
     if (props.transaction) {
       const t = props.transaction
       form.type = t.type
-      form.transaction_date = t.transaction_date?.slice(0,10) || new Date().toISOString().slice(0,10)
+      form.transaction_date = t.transaction_date?.slice(0,10) || getLocalDateString()
       form.account_id = t.account_id
       form.destination_account_id = t.destination_account_id
       form.category_id = t.category_id
@@ -167,7 +178,7 @@ watch(() => props.open, (isOpen) => {
       form.notes = t.notes || ''
     } else {
       form.type = 'expense'
-      form.transaction_date = new Date().toISOString().slice(0, 10)
+      form.transaction_date = getLocalDateString()
       form.account_id = undefined
       form.destination_account_id = undefined
       form.category_id = undefined
@@ -203,7 +214,7 @@ async function handleSubmit() {
       submitting.value = false
       return
     }
-    const payload = { ...form }
+    const payload = { ...form, ...props.extraPayload }
     if (props.transaction?.id) {
       const updated = await store.dispatch('transactions/updateTransaction', { id: props.transaction.id, data: payload })
       emit('saved', updated)
